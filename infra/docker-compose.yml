@@ -37,6 +37,32 @@ services:
     entrypoint: ['/bin/sh', '/entrypoint.sh']
     command: ['/usr/sbin/mosquitto', '-c', '/mosquitto/config/mosquitto.conf']
 
+  # The gateway: validates telemetry from local nodes against the generated
+  # contract and republishes it upstream unchanged. Credentials and GATEWAY_ID
+  # are set by hand in .env until the API implements pairing.
+  nodered:
+    image: nodered/node-red:4.0
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${NODE_RED_PORT:-1880}:1880' # editor from this machine only
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: '1883'
+      GATEWAY_ID: ${GATEWAY_ID:-}
+      MQTT_GATEWAY_USER: ${MQTT_GATEWAY_USER:-}
+      MQTT_GATEWAY_PASSWORD: ${MQTT_GATEWAY_PASSWORD:-}
+      # Node-RED only substitutes an env reference that is a field's entire
+      # value, so the composed client id is built here rather than in the flow.
+      MQTT_CLIENT_ID: gateway-${GATEWAY_ID:-dev}
+    volumes:
+      - ./nodered/data:/data
+      # Generated from libs/shared by `pnpm contract:gen`. After regenerating,
+      # `docker compose restart nodered` is enough; the flow is not edited.
+      - ./nodered/contract:/contract:ro
+    depends_on:
+      - mosquitto
+
 volumes:
   db-data:
   mosquitto-data:

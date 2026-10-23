@@ -21,6 +21,39 @@ export const topics = {
   statusFilter: 'gateways/+/status',
 } as const;
 
+/** Topic segments for the node -> gateway leg, shared with the firmware. */
+export const NODE_TELEMETRY_TOPIC = {
+  prefix: 'planters',
+  suffix: 'telemetry',
+} as const;
+
+/**
+ * Node -> gateway on the local broker. A node does not know its `gatewayId`,
+ * so it publishes under its own sensor key only and the gateway republishes the
+ * message upstream under its own identity. The payload is not rewritten on the
+ * way, so both legs carry exactly the same telemetry body.
+ */
+export const nodeTopics = {
+  telemetry: (sensorKey: string) =>
+    `${NODE_TELEMETRY_TOPIC.prefix}/${sensorKey}/${NODE_TELEMETRY_TOPIC.suffix}`,
+  /** Gateway-side subscription. */
+  telemetryFilter: `${NODE_TELEMETRY_TOPIC.prefix}/+/${NODE_TELEMETRY_TOPIC.suffix}`,
+} as const;
+
+export function parseNodeTelemetryTopic(
+  topic: string,
+): { sensorKey: string } | null {
+  const [prefix, sensorKey, suffix, ...rest] = topic.split('/');
+  if (
+    prefix !== NODE_TELEMETRY_TOPIC.prefix ||
+    suffix !== NODE_TELEMETRY_TOPIC.suffix ||
+    rest.length > 0
+  )
+    return null;
+  if (!SensorKeySchema.safeParse(sensorKey).success) return null;
+  return { sensorKey: sensorKey as string };
+}
+
 const UuidSchema = z.uuid();
 
 export function parseTelemetryTopic(

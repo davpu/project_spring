@@ -1,0 +1,210 @@
+[
+    {
+        "id": "tab_gateway",
+        "type": "tab",
+        "label": "Gateway",
+        "disabled": false,
+        "info": "Node -> gateway -> cloud. Subscribes to the local planters/+/telemetry, validates the body against the generated JSON Schema and republishes it unchanged under gateways/<gatewayId>/planters/<sensorKey>/telemetry.\n\nThe schema is not edited here. The source of truth is libs/shared/src/lib/metrics.ts; `pnpm contract:gen` generates infra/nodered/contract/ from it and docker-compose mounts that at /contract.\n\nGATEWAY_ID and the broker credentials come from the environment. Until the API implements pairing they are set by hand in .env."
+    },
+    {
+        "id": "broker",
+        "type": "mqtt-broker",
+        "name": "Broker",
+        "broker": "${MQTT_HOST}",
+        "port": "${MQTT_PORT}",
+        "clientid": "${MQTT_CLIENT_ID}",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "closeTopic": "",
+        "willTopic": ""
+    },
+    {
+        "id": "comment_contract",
+        "type": "comment",
+        "z": "tab_gateway",
+        "name": "Contract: libs/shared (pnpm contract:gen -> /contract)",
+        "info": "",
+        "x": 250,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "mqtt_in_local",
+        "type": "mqtt in",
+        "z": "tab_gateway",
+        "name": "planters/+/telemetry",
+        "topic": "planters/+/telemetry",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 160,
+        "y": 180,
+        "wires": [
+            [
+                "fn_parse"
+            ]
+        ]
+    },
+    {
+        "id": "fn_parse",
+        "type": "function",
+        "z": "tab_gateway",
+        "name": "sensor key + schema",
+        "func": "// The contract comes from libs/shared via functionGlobalContext\n// (infra/nodered/data/settings.js; docker-compose mounts /contract read-only).\n// Ranges and types are deliberately not here - the next node validates them\n// against the generated telemetry.schema.json.\nconst contract = global.get('contract');\nconst schema = global.get('telemetrySchema');\nif (!contract || !schema) {\n    node.error('contract missing from global context - is /contract mounted?', msg);\n    return null;\n}\n\nconst parts = String(msg.topic).split('/');\nconst sensorKey =\n    parts.length === 3 &&\n    parts[0] === contract.node.topicPrefix &&\n    parts[2] === contract.node.topicSuffix\n        ? parts[1]\n        : null;\n\nif (sensorKey === null || !new RegExp(contract.sensorKeyPattern).test(sensorKey)) {\n    msg.reason = `[${msg.topic}] topic does not match ${contract.node.telemetryFilter} with a valid sensor key (${contract.sensorKeyPattern})`;\n    return [null, msg];\n}\n\n// Keep the bytes that arrived and validate a parsed copy, so the gateway\n// forwards telemetry exactly as the node sent it.\nmsg.sensorKey = sensorKey;\nmsg.raw = msg.payload;\nmsg.schema = schema;\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "outputLabels": [
+            "to schema check",
+            "bad topic"
+        ],
+        "x": 390,
+        "y": 180,
+        "wires": [
+            [
+                "json_validate"
+            ],
+            [
+                "debug_rejected"
+            ]
+        ]
+    },
+    {
+        "id": "json_validate",
+        "type": "json",
+        "z": "tab_gateway",
+        "name": "parse + validate (msg.schema)",
+        "property": "payload",
+        "action": "obj",
+        "pretty": false,
+        "x": 650,
+        "y": 180,
+        "wires": [
+            [
+                "fn_route"
+            ]
+        ]
+    },
+    {
+        "id": "fn_route",
+        "type": "function",
+        "z": "tab_gateway",
+        "name": "upstream topic",
+        "func": "// Only the topic changes here: the gateway publishes under its own identity,\n// the body is the untouched string the node sent.\nconst contract = global.get('contract');\nconst gatewayId = env.get('GATEWAY_ID');\nif (!gatewayId) {\n    node.error('GATEWAY_ID is not set - the gateway has not been paired yet', msg);\n    return null;\n}\n\nmsg.topic = contract.cloud.telemetryTopic\n    .replace('{gatewayId}', gatewayId)\n    .replace('{sensorKey}', msg.sensorKey);\nmsg.payload = msg.raw;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 900,
+        "y": 180,
+        "wires": [
+            [
+                "mqtt_out_cloud",
+                "debug_forwarded"
+            ]
+        ]
+    },
+    {
+        "id": "mqtt_out_cloud",
+        "type": "mqtt out",
+        "z": "tab_gateway",
+        "name": "gateways/+/planters/+/telemetry",
+        "topic": "",
+        "qos": "1",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "broker",
+        "x": 1180,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "debug_forwarded",
+        "type": "debug",
+        "z": "tab_gateway",
+        "name": "forwarded",
+        "active": true,
+        "tosidebar": true,
+        "console": true,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "topic",
+        "statusType": "msg",
+        "x": 1150,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "catch_validate",
+        "type": "catch",
+        "z": "tab_gateway",
+        "name": "validation errors",
+        "scope": [
+            "json_validate"
+        ],
+        "uncaught": false,
+        "x": 390,
+        "y": 320,
+        "wires": [
+            [
+                "fn_reason"
+            ]
+        ]
+    },
+    {
+        "id": "fn_reason",
+        "type": "function",
+        "z": "tab_gateway",
+        "name": "readable reason",
+        "func": "// Two kinds of failure arrive here from the `json` node: invalid JSON and a\n// body that failed the schema. msg.error.message already carries the ajv\n// errorsText; msg.schemaError holds the structured detail for schema failures.\nconst detail = (msg.error && msg.error.message) || 'unknown error';\nconst raw = typeof msg.raw === 'string' ? msg.raw : JSON.stringify(msg.payload);\nmsg.reason = `[${msg.topic}] ${detail} :: ${String(raw).slice(0, 160)}`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 630,
+        "y": 320,
+        "wires": [
+            [
+                "debug_rejected"
+            ]
+        ]
+    },
+    {
+        "id": "debug_rejected",
+        "type": "debug",
+        "z": "tab_gateway",
+        "name": "rejected",
+        "active": true,
+        "tosidebar": true,
+        "console": true,
+        "tostatus": true,
+        "complete": "reason",
+        "targetType": "msg",
+        "statusVal": "reason",
+        "statusType": "msg",
+        "x": 860,
+        "y": 320,
+        "wires": []
+    }
+]

@@ -4,6 +4,7 @@
   "license": "MIT",
   "packageManager": "pnpm@12.9.1",
   "scripts": {
+    "contract:gen": "nx run shared:contract-gen",
     "db:generate": "drizzle-kit generate --config libs/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config libs/db/drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config libs/db/drizzle.config.ts"

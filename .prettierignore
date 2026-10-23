@@ -7,3 +7,6 @@
 # Generated
 pnpm-lock.yaml
 /libs/db/migrations
+/infra/nodered/contract
+/infra/nodered/data
+/firmware/include/contract.h
