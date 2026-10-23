@@ -19,8 +19,8 @@ libs/
 infra/
   docker-compose.yml   # local Postgres + TimescaleDB, MQTT broker and gateway
   nodered/             # the gateway: flow, settings and the generated contract
-firmware/
-  include/contract.h   # generated C++ contract for the ESP32 (no firmware yet)
+firmware/             # ESP32 node, PlatformIO - see firmware/README.md
+  include/contract.h   # generated C++ contract, do not edit by hand
 ```
 
 ## Telemetry contract
@@ -137,4 +137,4 @@ CI (`.github/workflows/ci.yml`) runs `pnpm nx format:check` and `pnpm nx run-man
 - There is no MQTT ingest in the API yet, so telemetry the gateway forwards is not persisted.
 - Pairing is defined in `libs/shared` but no API endpoint implements it, so the gateway's `gatewayId` and broker credentials are configured by hand.
 - The gateway does not publish its `online`/`offline` status yet.
-- There is no ESP32 firmware in this repo yet, only the generated `contract.h` it will include.
+- The ESP32 node reads its sensors and publishes telemetry, but it does not pair with the API: its broker credentials are set at flash time. See `firmware/README.md`.

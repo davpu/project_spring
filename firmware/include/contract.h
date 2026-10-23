@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include <optional>
+
 namespace contract {
 
 // A node publishes to the local broker under its own sensor key; the
@@ -37,9 +39,9 @@ inline constexpr int SOIL_HUMIDITY_MIN = 0;
 inline constexpr int SOIL_HUMIDITY_MAX = 100;
 
 struct TelemetryPayload {
-  float airTemperature;
-  float airHumidity;
-  int soilHumidity;
+  std::optional<float> airTemperature;
+  std::optional<float> airHumidity;
+  std::optional<int> soilHumidity;
 };
 
 // Clamps a value to the resolution the contract allows, so a node cannot
@@ -48,15 +50,26 @@ inline float roundToResolution(float value, float resolution) {
   return resolution <= 0.0f ? value : roundf(value / resolution) * resolution;
 }
 
-// Serializes a reading to the telemetry JSON body. Returns the number of
-// bytes written, excluding the terminating null; if the output does not fit
-// it is truncated, so check the result is below len - 1.
+// Serializes the measurements that are present. The contract requires at
+// least one, so an empty reading writes nothing and returns 0. Otherwise
+// returns the number of bytes written, excluding the terminating null; if
+// the output does not fit it is truncated, so check the result is below
+// len - 1.
 inline size_t serialize(const TelemetryPayload& reading, char* out,
                         size_t len) {
   JsonDocument doc;
-  doc["airTemperature"] = reading.airTemperature;
-  doc["airHumidity"] = roundToResolution(reading.airHumidity, AIR_HUMIDITY_RESOLUTION);
-  doc["soilHumidity"] = reading.soilHumidity;
+  if (reading.airTemperature) {
+    doc["airTemperature"] = *reading.airTemperature;
+  }
+  if (reading.airHumidity) {
+    doc["airHumidity"] = roundToResolution(*reading.airHumidity, AIR_HUMIDITY_RESOLUTION);
+  }
+  if (reading.soilHumidity) {
+    doc["soilHumidity"] = *reading.soilHumidity;
+  }
+  if (doc.size() == 0) {
+    return 0;
+  }
   return serializeJson(doc, out, len);
 }
 

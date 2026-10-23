@@ -1,0 +1,4 @@
+.pio/
+
+# Per-device WiFi and broker credentials
+include/config.h

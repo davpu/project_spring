@@ -191,15 +191,24 @@ export function buildFirmwareHeader(): string {
     return lines;
   });
 
+  // Every measurement is optional in the contract, so a node that loses one
+  // sensor can still report the others instead of dropping the whole reading.
   const members = fields.map(
-    ({ metric, field }) => `  ${CPP_TYPES[field.type]} ${metric};`,
+    ({ metric, field }) =>
+      `  std::optional<${CPP_TYPES[field.type]}> ${metric};`,
   );
 
-  const assignments = fields.map(({ metric, field }) =>
-    field.multipleOf === undefined
-      ? `  doc["${metric}"] = reading.${metric};`
-      : `  doc["${metric}"] = roundToResolution(reading.${metric}, ${constantName(metric)}_RESOLUTION);`,
-  );
+  const assignments = fields.flatMap(({ metric, field }) => {
+    const value =
+      field.multipleOf === undefined
+        ? `*reading.${metric}`
+        : `roundToResolution(*reading.${metric}, ${constantName(metric)}_RESOLUTION)`;
+    return [
+      `  if (reading.${metric}) {`,
+      `    doc["${metric}"] = ${value};`,
+      '  }',
+    ];
+  });
 
   return [
     `// ${AUTO_GENERATED}`,
@@ -212,6 +221,8 @@ export function buildFirmwareHeader(): string {
     '#include <math.h>',
     '#include <stddef.h>',
     '#include <stdio.h>',
+    '',
+    '#include <optional>',
     '',
     'namespace contract {',
     '',
@@ -239,13 +250,18 @@ export function buildFirmwareHeader(): string {
     '  return resolution <= 0.0f ? value : roundf(value / resolution) * resolution;',
     '}',
     '',
-    '// Serializes a reading to the telemetry JSON body. Returns the number of',
-    '// bytes written, excluding the terminating null; if the output does not fit',
-    '// it is truncated, so check the result is below len - 1.',
+    '// Serializes the measurements that are present. The contract requires at',
+    '// least one, so an empty reading writes nothing and returns 0. Otherwise',
+    '// returns the number of bytes written, excluding the terminating null; if',
+    '// the output does not fit it is truncated, so check the result is below',
+    '// len - 1.',
     'inline size_t serialize(const TelemetryPayload& reading, char* out,',
     '                        size_t len) {',
     '  JsonDocument doc;',
     ...assignments,
+    '  if (doc.size() == 0) {',
+    '    return 0;',
+    '  }',
     '  return serializeJson(doc, out, len);',
     '}',
     '',
