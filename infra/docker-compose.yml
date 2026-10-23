@@ -1,0 +1,42 @@
+# Local development stack: Postgres + TimescaleDB and the MQTT broker.
+# Usage (from repo root): docker compose --env-file .env -f infra/docker-compose.yml up -d
+name: spring
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-spring}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spring}
+      POSTGRES_DB: ${POSTGRES_DB:-spring}
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    environment:
+      # Bootstrap admin for the dynamic-security plugin, used by the API to
+      # manage per-gateway credentials and to subscribe to telemetry.
+      MQTT_ADMIN_USER: ${MQTT_ADMIN_USER:-api}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:-api-dev-password}
+    ports:
+      - '${MQTT_PORT:-1883}:1883'
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/entrypoint.sh:/entrypoint.sh:ro
+      - mosquitto-data:/mosquitto/data
+    entrypoint: ['/bin/sh', '/entrypoint.sh']
+    command: ['/usr/sbin/mosquitto', '-c', '/mosquitto/config/mosquitto.conf']
+
+volumes:
+  db-data:
+  mosquitto-data:
