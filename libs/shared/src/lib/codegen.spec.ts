@@ -52,6 +52,14 @@ describe('JSON Schema stays loadable by the gateway', () => {
     expect(JSON.stringify(schema)).not.toContain('"format"');
   });
 
+  it('carries no multipleOf keyword', () => {
+    // Zod checks multipleOf float-safely; the ajv build inside Node-RED
+    // rejects roughly a third of all one-decimal values (0.3, 0.6, 1.2, ...).
+    // In the schema it silently dropped valid readings at the gateway and made
+    // the generated validator disagree with the Zod one it comes from.
+    expect(JSON.stringify(schema)).not.toContain('"multipleOf"');
+  });
+
   it('requires at least one measurement, like the Zod schema does', () => {
     expect(schema['anyOf']).toEqual([
       { required: ['airTemperature'] },

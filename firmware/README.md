@@ -47,6 +47,18 @@ docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto sh -c 
 '
 ```
 
+The node may only publish, and only under `planters/#`. Watching topics needs its own client, because a node has no business reading anything:
+
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto sh -c '
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec createClient debug-dev -p debug-dev-password
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec createRole debug-dev
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec addRoleACL debug-dev subscribePattern "#" allow
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec addRoleACL debug-dev publishClientReceive "#" allow
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec addClientRole debug-dev debug-dev
+'
+```
+
 **3. Point the node at the machine, not at itself:**
 
 ```bash
@@ -83,11 +95,11 @@ published planters/node-a1b2c3/telemetry {"airTemperature":20.4,"airHumidity":30
 ```bash
 # did the node's message arrive at the broker at all?
 docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto \
-  mosquitto_sub -u node-dev -P node-dev-password -v -t 'planters/#'
+  mosquitto_sub -u debug-dev -P debug-dev-password -v -t 'planters/#'
 
 # did the gateway validate it and republish it upstream?
 docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto \
-  mosquitto_sub -u node-dev -P node-dev-password -v -t 'gateways/#'
+  mosquitto_sub -u debug-dev -P debug-dev-password -v -t 'gateways/#'
 
 # and if it was rejected, why
 docker compose --env-file .env -f infra/docker-compose.yml logs -f nodered
@@ -131,7 +143,7 @@ pio device monitor       # serial output at 115200
 
 Every measurement is optional, so a node whose DHT22 fails still reports soil humidity rather than dropping the whole reading. A reading with nothing in it serializes to zero bytes and is not published, which matches the contract's requirement of at least one measurement.
 
-`contract::serialize()` rounds each field to the resolution the contract allows, so the firmware cannot publish more precision than the sensor delivers and then have the gateway reject it.
+`contract::serialize()` rounds each field to the resolution the contract declares, so the node does not claim more precision than its sensor delivers. That rounding is the only thing enforcing resolution: the gateway's schema deliberately does not check it, because `multipleOf` on a non-integer is unreliable in the ajv build Node-RED uses.
 
 ## Known gaps
 

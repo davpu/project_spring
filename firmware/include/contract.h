@@ -27,7 +27,7 @@ inline int telemetryTopic(const char* sensorKey, char* out, size_t len) {
 }
 
 // airTemperature in °C
-// no bounds in the contract
+inline constexpr float AIR_TEMPERATURE_RESOLUTION = 0.1f;
 
 // airHumidity in %
 inline constexpr float AIR_HUMIDITY_MIN = 0.0f;
@@ -37,6 +37,7 @@ inline constexpr float AIR_HUMIDITY_RESOLUTION = 0.1f;
 // soilHumidity in %
 inline constexpr int SOIL_HUMIDITY_MIN = 0;
 inline constexpr int SOIL_HUMIDITY_MAX = 100;
+inline constexpr float SOIL_HUMIDITY_RESOLUTION = 1.0f;
 
 struct TelemetryPayload {
   std::optional<float> airTemperature;
@@ -59,7 +60,7 @@ inline size_t serialize(const TelemetryPayload& reading, char* out,
                         size_t len) {
   JsonDocument doc;
   if (reading.airTemperature) {
-    doc["airTemperature"] = *reading.airTemperature;
+    doc["airTemperature"] = roundToResolution(*reading.airTemperature, AIR_TEMPERATURE_RESOLUTION);
   }
   if (reading.airHumidity) {
     doc["airHumidity"] = roundToResolution(*reading.airHumidity, AIR_HUMIDITY_RESOLUTION);

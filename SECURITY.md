@@ -38,9 +38,7 @@ The same credentials are also flashed into every node, so compromising one node 
 
 ### 3. The node's broker role is wider than a node needs
 
-The node role additionally allows `subscribePattern` and `publishClientReceive` on `gateways/#`. That was granted to let a single client double as a test subscriber during development. A node has no reason to read the upstream topic at all.
-
-**Not accepted.** Should be removed and a separate client used for debugging.
+**Fixed.** The node role briefly also allowed `subscribePattern` and `publishClientReceive` on `gateways/#`, granted so one client could double as a test subscriber. It is now `publishClientSend` on `planters/#` and nothing else, and a separate `debug-dev` client exists for watching topics.
 
 ### 4. Credentials are readable from a node's flash
 

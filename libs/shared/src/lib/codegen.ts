@@ -12,7 +12,12 @@
  */
 import { z } from 'zod';
 
-import { METRICS, METRIC_UNITS, TelemetryPayloadSchema } from './metrics.js';
+import {
+  METRICS,
+  METRIC_RESOLUTION,
+  METRIC_UNITS,
+  TelemetryPayloadSchema,
+} from './metrics.js';
 import {
   NODE_TELEMETRY_TOPIC,
   SensorKeySchema,
@@ -58,7 +63,6 @@ const NumericFieldSchema = z.object({
   type: z.enum(['number', 'integer']),
   minimum: z.number().optional(),
   maximum: z.number().optional(),
-  multipleOf: z.number().optional(),
 });
 type NumericField = z.infer<typeof NumericFieldSchema>;
 
@@ -181,12 +185,9 @@ export function buildFirmwareHeader(): string {
         `inline constexpr ${cppType} ${name}_MAX = ${cppLiteral(field.maximum, field.type)};`,
       );
     }
-    if (field.multipleOf !== undefined) {
-      lines.push(
-        `inline constexpr float ${name}_RESOLUTION = ${cppLiteral(field.multipleOf, 'number')};`,
-      );
-    }
-    if (lines.length === 1) lines.push(`// no bounds in the contract`);
+    lines.push(
+      `inline constexpr float ${name}_RESOLUTION = ${cppLiteral(METRIC_RESOLUTION[metric], 'number')};`,
+    );
     lines.push('');
     return lines;
   });
@@ -200,7 +201,7 @@ export function buildFirmwareHeader(): string {
 
   const assignments = fields.flatMap(({ metric, field }) => {
     const value =
-      field.multipleOf === undefined
+      field.type === 'integer'
         ? `*reading.${metric}`
         : `roundToResolution(*reading.${metric}, ${constantName(metric)}_RESOLUTION)`;
     return [

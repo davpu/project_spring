@@ -66,8 +66,8 @@ constexpr int PIN_SOIL = 34;
 static_assert(PUBLISH_INTERVAL_MS >= 2000,
               "PUBLISH_INTERVAL_MS must be at least 2000 for the DHT22");
 
-constexpr unsigned long WIFI_RETRY_MS = 5000;
-constexpr unsigned long MQTT_RETRY_MS = 5000;
+constexpr unsigned long WIFI_RETRY_MS = 15000;
+constexpr unsigned long MQTT_RETRY_MS = 15000;
 
 DHT dht(PIN_DHT, DHT22);
 WiFiClient net;

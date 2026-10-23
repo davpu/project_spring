@@ -51,13 +51,18 @@ describe('telemetry payload', () => {
     );
   });
 
-  it('holds each sensor to the resolution it can actually measure', () => {
+  it('does not police decimal resolution, only whole-number metrics', () => {
+    // Resolution is a producer concern (METRIC_RESOLUTION, applied by the
+    // firmware), not a schema rule: `multipleOf` on a non-integer is checked
+    // float-safely by Zod but not by the ajv build inside Node-RED, so the two
+    // validators would disagree on a third of all one-decimal values. Integers
+    // are exact in both.
     expect(
       TelemetryPayloadSchema.safeParse({ airHumidity: 30.7 }).success,
     ).toBe(true);
     expect(
       TelemetryPayloadSchema.safeParse({ airHumidity: 30.75 }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(TelemetryPayloadSchema.safeParse({ soilHumidity: 40 }).success).toBe(
       true,
     );

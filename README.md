@@ -39,6 +39,8 @@ A gateway publishes one JSON payload per planter. At least one measurement is re
 
 These field names are also the metric ids stored in the `readings` table, so nothing is renamed between the wire and the database. The source of truth for all of this is `libs/shared`, in particular `libs/shared/src/lib/metrics.ts`.
 
+Resolution is what a producer rounds to before publishing (`METRIC_RESOLUTION`), not something the schema enforces. `multipleOf` on a non-integer is not portable: Zod checks it float-safely while the ajv build inside Node-RED rejects about a third of all one-decimal values, so in the schema it dropped valid readings and made the generated validator disagree with the Zod one it is generated from. Whole-number metrics are still enforced as `integer`, which both agree on.
+
 ### MQTT topics
 
 Defined in `libs/shared/src/lib/topics.ts`:
