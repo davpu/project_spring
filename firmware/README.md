@@ -23,9 +23,87 @@ Everything in it has a default, so the project builds without it, but a node fla
 
 `PUBLISH_INTERVAL_MS` defaults to 30000. A reading is taken immediately before each publish and the DHT22 cannot be sampled more than once every two seconds, so a `static_assert` rejects anything below 2000.
 
+## Testing a real node against the stack
+
+The node talks to the broker in `infra/docker-compose.yml` over the LAN, so three things have to line up: the node is on the same network, it points at the machine's LAN address, and the broker has a client for it.
+
+**1. Bring the stack up** from the repo root:
+
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml up -d
+```
+
+**2. Create the node's broker client**, once. The broker runs with `allow_anonymous false`, so a node with no client of its own is rejected before it can publish anything. This is the same manual step as the gateway's client and goes away when the API takes over provisioning:
+
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto sh -c '
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec createClient node-dev -p node-dev-password
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec createRole node-dev
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec addRoleACL node-dev publishClientSend "planters/#" allow
+  mosquitto_ctrl -u "$MQTT_ADMIN_USER" -P "$MQTT_ADMIN_PASSWORD" dynsec addClientRole node-dev node-dev
+'
+```
+
+**3. Point the node at the machine, not at itself:**
+
+```bash
+ipconfig getifaddr en0    # macOS; this is what MQTT_HOST must be
+```
+
+Put that address in `include/config.h` as `MQTT_HOST`, together with the WiFi credentials and `MQTT_USERNAME` / `MQTT_PASSWORD` for the client you just created. `localhost` and `127.0.0.1` point the node at its own chip.
+
+**4. Flash and watch the node:**
+
+```bash
+pio run -t upload && pio device monitor
+```
+
+A healthy start looks like this:
+
+```
+node node-a1b2c3 start, publishing to planters/node-a1b2c3/telemetry every 30000 ms
+WiFi: connected, ip=192.168.50.57 rssi=-58 dBm
+MQTT: connected as node-a1b2c3, publishing to planters/node-a1b2c3/telemetry
+soil: raw=2480 -> 42 %
+published planters/node-a1b2c3/telemetry {"airTemperature":20.4,"airHumidity":30.3,"soilHumidity":42}
+```
+
+**5. Watch both legs from the other side.** This is what tells you whether the node reached the broker and whether the gateway accepted what it sent. Run each in its own terminal:
+
+```bash
+# did the node's message arrive at the broker at all?
+docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto \
+  mosquitto_sub -u node-dev -P node-dev-password -v -t 'planters/#'
+
+# did the gateway validate it and republish it upstream?
+docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto \
+  mosquitto_sub -u node-dev -P node-dev-password -v -t 'gateways/#'
+
+# and if it was rejected, why
+docker compose --env-file .env -f infra/docker-compose.yml logs -f nodered
+```
+
+Seeing it on `planters/#` but not on `gateways/#` means the node is fine and the gateway rejected the body; the Node-RED log gives the reason.
+
+### When it does not connect
+
+The serial monitor says which step failed.
+
+| serial output                         | what it means                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------ |
+| stuck on `WiFi: connecting to ...`    | wrong SSID or password, or a 5 GHz network: the ESP32 is 2.4 GHz only                |
+| `state=-2 could not reach the broker` | wrong `MQTT_HOST`, the node is on a different network, or the stack is not up        |
+| `state=4 bad username or password`    | the client exists but the password differs from `config.h`                           |
+| `state=5 not authorised`              | the client has no role allowing `publishClientSend` on `planters/#`                  |
+| `DHT22: ... read failed`              | wiring or the missing 10k pull-up; the node still publishes soil humidity on its own |
+
+Guest networks and client isolation are worth ruling out early: they let the node online while blocking it from reaching other devices on the LAN.
+
 ## Soil calibration
 
-`SOIL_RAW_DRY` and `SOIL_RAW_WET` default to the full 12-bit range, which is almost certainly wrong for your probe. Measure it: flash the node, watch the serial monitor, and note the raw value with the probe in air and then submerged in water. Put those two numbers in `config.h`.
+`SOIL_RAW_DRY` and `SOIL_RAW_WET` default to 3200 and 1510, measured on this project's probe. A different probe needs its own numbers: flash the node, watch `soil: raw=...` in the serial monitor, note the value with the probe in air and then submerged, and override both in `config.h`.
+
+The raw value falls as the soil gets wetter, so `SOIL_RAW_DRY` is the larger of the two. The firmware maps that range onto 0 to 100 % and clamps to the contract's bounds, so a probe reading past either calibration point reports 0 or 100 rather than something nonsensical.
 
 ## Build and flash
 

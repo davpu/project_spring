@@ -39,13 +39,17 @@
 #define PUBLISH_INTERVAL_MS 30000
 #endif
 
-// Measure these for the actual probe: raw ADC in air, then submerged.
+// Measured on this project's probe: raw ADC in air, then submerged. A
+// different probe needs its own numbers, so both are overridable in config.h.
 #ifndef SOIL_RAW_DRY
-#define SOIL_RAW_DRY 4095
+#define SOIL_RAW_DRY 3200
 #endif
 #ifndef SOIL_RAW_WET
-#define SOIL_RAW_WET 0
+#define SOIL_RAW_WET 1510
 #endif
+
+static_assert(SOIL_RAW_DRY != SOIL_RAW_WET,
+              "soil calibration endpoints must differ");
 
 constexpr int PIN_DHT = 4;   // DHT22 data, with a 10k pull-up to 3V3
 constexpr int PIN_SOIL = 34; // soil probe; ADC1 only, ADC2 is dead with WiFi on
@@ -79,9 +83,17 @@ static void deriveSensorKey() {
 }
 
 static bool ensureWifi() {
+  static bool announced = false;
+
   if (WiFi.status() == WL_CONNECTED) {
+    if (!announced) {
+      Serial.printf("WiFi: connected, ip=%s rssi=%d dBm\n",
+                    WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      announced = true;
+    }
     return true;
   }
+  announced = false;
 
   static unsigned long lastAttempt = 0;
   const unsigned long now = millis();
@@ -93,6 +105,36 @@ static bool ensureWifi() {
   Serial.printf("WiFi: connecting to %s\n", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   return false;
+}
+
+// PubSubClient only reports a number, and the difference between "the broker
+// is unreachable" and "the broker rejected these credentials" is exactly what
+// you need when bringing a node up on a new network.
+static const char* mqttStateText(int state) {
+  switch (state) {
+    case -4:
+      return "timed out waiting for the broker";
+    case -3:
+      return "connection lost";
+    case -2:
+      return "could not reach the broker - wrong MQTT_HOST, or not on this LAN";
+    case -1:
+      return "disconnected cleanly";
+    case 0:
+      return "connected";
+    case 1:
+      return "broker refused the protocol version";
+    case 2:
+      return "broker rejected the client id";
+    case 3:
+      return "broker unavailable";
+    case 4:
+      return "bad username or password";
+    case 5:
+      return "not authorised - the client exists but its ACLs forbid this";
+    default:
+      return "unknown";
+  }
 }
 
 static bool ensureMqtt() {
@@ -115,7 +157,9 @@ static bool ensureMqtt() {
     return true;
   }
 
-  Serial.printf("MQTT: connect failed, state=%d\n", mqtt.state());
+  const int state = mqtt.state();
+  Serial.printf("MQTT: connect to %s:%d failed, state=%d (%s)\n", MQTT_HOST,
+                MQTT_PORT, state, mqttStateText(state));
   return false;
 }
 
