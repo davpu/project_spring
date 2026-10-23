@@ -129,6 +129,10 @@ pnpm nx test shared
 
 CI (`.github/workflows/ci.yml`) runs `pnpm nx format:check` and `pnpm nx run-many -t lint test build typecheck` on every push to `main` and on every pull request.
 
+## Security
+
+`SECURITY.md` records what the current setup protects against, what it does not, and which gaps are deliberate. The short version: every MQTT client authenticates, but nothing uses TLS yet and the API has no authorisation, so this is a home-LAN system and not more than that.
+
 ## Status
 
 - `libs/shared` (telemetry contract, MQTT topics, pairing) and `libs/db` (Drizzle schema for users, gateways, pairing codes, planters, plants and readings) are implemented.

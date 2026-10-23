@@ -10,6 +10,7 @@
 #include <DHT.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <esp_mac.h>
 
 #include "contract.h"
 
@@ -77,14 +78,24 @@ PubSubClient mqtt(net);
 char sensorKey[65];
 char telemetryTopic[128];
 
-static void deriveSensorKey() {
+static bool deriveSensorKey() {
 #ifdef SENSOR_KEY
   snprintf(sensorKey, sizeof(sensorKey), "%s", SENSOR_KEY);
+  return true;
 #else
+  // Read the MAC straight out of eFuse. WiFi.macAddress() returns zeros until
+  // the WiFi driver has fully started, and a node that names itself
+  // node-000000 silently merges its readings with every other node's.
   uint8_t mac[6] = {0};
-  WiFi.macAddress(mac);
+  if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) {
+    return false;
+  }
+  if ((mac[0] | mac[1] | mac[2] | mac[3] | mac[4] | mac[5]) == 0) {
+    return false;
+  }
   snprintf(sensorKey, sizeof(sensorKey), "node-%02x%02x%02x", mac[3], mac[4],
            mac[5]);
+  return true;
 #endif
 }
 
@@ -254,7 +265,15 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  deriveSensorKey();
+  // Refuse to run without a unique identity: two nodes sharing a sensor key
+  // would write into the same planter's history.
+  if (!deriveSensorKey()) {
+    Serial.println("could not read a unique MAC for the sensor key - set "
+                   "SENSOR_KEY in config.h, halting");
+    while (true) {
+      delay(1000);
+    }
+  }
 
   const int needed =
       contract::telemetryTopic(sensorKey, telemetryTopic, sizeof(telemetryTopic));
