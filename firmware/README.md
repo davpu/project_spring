@@ -6,12 +6,15 @@ The node knows nothing about the cloud. It publishes to `planters/<sensorKey>/te
 
 ## Wiring
 
-| sensor              | pin    | note                                                  |
-| ------------------- | ------ | ----------------------------------------------------- |
-| DHT22 data          | GPIO4  | needs a 10k pull-up to 3V3                            |
-| soil moisture probe | GPIO34 | input only, and ADC1: ADC2 does not work with WiFi on |
+| sensor              | pin    | read as | note                              |
+| ------------------- | ------ | ------- | --------------------------------- |
+| DHT22 data          | GPIO4  | digital | needs a 10k pull-up to 3V3        |
+| soil moisture probe | GPIO34 | analog  | input only, and must stay on ADC1 |
 
-If you move the soil probe, keep it on ADC1 (GPIO32 to GPIO39). ADC2 is unavailable while the WiFi radio is active, which is the usual cause of a probe that reads fine until the node connects.
+The ADC2 pins cannot be read while the WiFi radio is active. That restriction applies to `analogRead` and the ADC peripheral, **not** to a pin's digital function, so it only constrains the soil probe:
+
+- The soil probe is analog, so it has to be on ADC1 (GPIO32 to GPIO39). On an ADC2 pin it reads fine on the bench and then returns garbage the moment the node associates, which is the classic version of this bug.
+- GPIO4 is in fact ADC2_CH0, and that is harmless. The DHT22 speaks a bit-banged one-wire protocol and the library only ever calls `pinMode` and `digitalRead`/`digitalWrite` on it, so the ADC is not involved. There is no reason to move it.
 
 ## Configuration
 

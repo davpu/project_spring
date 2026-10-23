@@ -51,8 +51,14 @@
 static_assert(SOIL_RAW_DRY != SOIL_RAW_WET,
               "soil calibration endpoints must differ");
 
-constexpr int PIN_DHT = 4;   // DHT22 data, with a 10k pull-up to 3V3
-constexpr int PIN_SOIL = 34; // soil probe; ADC1 only, ADC2 is dead with WiFi on
+// GPIO4 is ADC2_CH0, which does not matter here: the DHT22 is a digital
+// one-wire sensor read with digitalRead, and the ADC2/WiFi conflict below
+// applies to the ADC peripheral, not to a pin's digital function.
+constexpr int PIN_DHT = 4; // DHT22 data, with a 10k pull-up to 3V3
+
+// Read with analogRead, so this one has to be on ADC1 (GPIO32-39): ADC2 is
+// unusable while the WiFi radio is active.
+constexpr int PIN_SOIL = 34;
 
 // The DHT22 cannot be sampled faster than once every two seconds, and a
 // reading is taken immediately before each publish.
