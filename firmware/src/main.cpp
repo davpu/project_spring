@@ -143,6 +143,22 @@ static const char* mqttStateText(int state) {
   }
 }
 
+// Separates "the name does not resolve" from "it resolves but the connection
+// was refused". That distinction is the whole difficulty when MQTT_HOST is an
+// mDNS `.local` name rather than a literal address.
+static void reportHostResolution() {
+  IPAddress address;
+  if (WiFi.hostByName(MQTT_HOST, address)) {
+    Serial.printf("MQTT: %s resolves to %s, so the broker is not answering on "
+                  "port %d\n",
+                  MQTT_HOST, address.toString().c_str(), MQTT_PORT);
+  } else {
+    Serial.printf("MQTT: cannot resolve %s - wrong name, or no mDNS answer on "
+                  "this network\n",
+                  MQTT_HOST);
+  }
+}
+
 static bool ensureMqtt() {
   if (mqtt.connected()) {
     return true;
@@ -166,6 +182,9 @@ static bool ensureMqtt() {
   const int state = mqtt.state();
   Serial.printf("MQTT: connect to %s:%d failed, state=%d (%s)\n", MQTT_HOST,
                 MQTT_PORT, state, mqttStateText(state));
+  if (state == -2) {
+    reportHostResolution();
+  }
   return false;
 }
 

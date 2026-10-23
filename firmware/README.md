@@ -55,6 +55,13 @@ ipconfig getifaddr en0    # macOS; this is what MQTT_HOST must be
 
 Put that address in `include/config.h` as `MQTT_HOST`, together with the WiFi credentials and `MQTT_USERNAME` / `MQTT_PASSWORD` for the client you just created. `localhost` and `127.0.0.1` point the node at its own chip.
 
+A DHCP lease will eventually move that address, and the node only learns it at flash time, so a literal IP means reflashing every time it changes. Two ways out:
+
+- **An mDNS name**, for example `#define MQTT_HOST "my-mac.local"`. The Arduino ESP32 build has `CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES` enabled, so lwIP resolves `.local` names over multicast with no extra code and nothing to initialise. Get the name from `scutil --get LocalHostName` on macOS. Multicast is the catch: some networks filter it, and guest or IoT SSIDs often do.
+- **A static DHCP reservation** on the router, tying the machine's MAC to one address. More reliable, but it needs router access.
+
+If the name does not resolve, the serial monitor says so explicitly rather than leaving you to guess, and the literal address always works as a fallback.
+
 **4. Flash and watch the node:**
 
 ```bash
@@ -92,13 +99,15 @@ Seeing it on `planters/#` but not on `gateways/#` means the node is fine and the
 
 The serial monitor says which step failed.
 
-| serial output                         | what it means                                                                        |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| stuck on `WiFi: connecting to ...`    | wrong SSID or password, or a 5 GHz network: the ESP32 is 2.4 GHz only                |
-| `state=-2 could not reach the broker` | wrong `MQTT_HOST`, the node is on a different network, or the stack is not up        |
-| `state=4 bad username or password`    | the client exists but the password differs from `config.h`                           |
-| `state=5 not authorised`              | the client has no role allowing `publishClientSend` on `planters/#`                  |
-| `DHT22: ... read failed`              | wiring or the missing 10k pull-up; the node still publishes soil humidity on its own |
+| serial output                                       | what it means                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| stuck on `WiFi: connecting to ...`                  | wrong SSID or password, or a 5 GHz network: the ESP32 is 2.4 GHz only                |
+| `state=-2 could not reach the broker`               | wrong `MQTT_HOST`, the node is on a different network, or the stack is not up        |
+| `cannot resolve ... no mDNS answer`                 | a `.local` `MQTT_HOST` that the network does not answer; use the literal address     |
+| `... resolves to X, so the broker is not answering` | the name is fine; the stack is down or the port is not published                     |
+| `state=4 bad username or password`                  | the client exists but the password differs from `config.h`                           |
+| `state=5 not authorised`                            | the client has no role allowing `publishClientSend` on `planters/#`                  |
+| `DHT22: ... read failed`                            | wiring or the missing 10k pull-up; the node still publishes soil humidity on its own |
 
 Guest networks and client isolation are worth ruling out early: they let the node online while blocking it from reaching other devices on the LAN.
 
