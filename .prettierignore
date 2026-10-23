@@ -4,3 +4,6 @@
 /.nx/cache
 /.nx/workspace-data
 .nx/self-healing
+# Generated
+pnpm-lock.yaml
+/libs/db/migrations
