@@ -2,10 +2,26 @@ import { forwardRef, useId, type ReactNode } from 'react';
 import { TextInput, type TextInputProps } from 'react95';
 import styled from 'styled-components';
 
-const Field = styled.div`
+const Field = styled.div<{ $inline: boolean }>`
   display: flex;
   flex-direction: column;
   gap: 4px;
+
+  /* Label beside the input, Win95 dialog style; stacks again on phones. */
+  ${({ $inline }) =>
+    $inline &&
+    `
+    @media (min-width: 480px) {
+      display: grid;
+      grid-template-columns: var(--label-width, 140px) minmax(0, 1fr);
+      align-items: center;
+      column-gap: 8px;
+
+      & > :not(label) {
+        grid-column: 2;
+      }
+    }
+  `}
 `;
 
 const Row = styled.div`
@@ -26,6 +42,11 @@ export type TextFieldProps = {
   hint?: ReactNode;
   /** Rendered next to the input, e.g. a show/hide toggle. */
   adornment?: ReactNode;
+  /**
+   * Puts the label to the left of the input. Width comes from the
+   * `--label-width` custom property so a form can align all its labels.
+   */
+  inline?: boolean;
 } & Omit<
   Extract<TextInputProps, { multiline?: false }>,
   'multiline' | 'fullWidth'
@@ -33,7 +54,7 @@ export type TextFieldProps = {
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
   function TextField(
-    { label, error, hint, adornment, id, ...inputProps },
+    { label, error, hint, adornment, inline = false, id, ...inputProps },
     ref,
   ) {
     const generatedId = useId();
@@ -44,7 +65,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       [hint && hintId, error && errorId].filter(Boolean).join(' ') || undefined;
 
     return (
-      <Field>
+      <Field $inline={inline}>
         <label htmlFor={inputId}>{label}</label>
         <Row>
           <TextInput
