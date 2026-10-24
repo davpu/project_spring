@@ -2,7 +2,7 @@
 
 What this system currently protects against, what it does not, and which gaps are deliberate. Written against the state of the repo, not against intentions: anything described as missing is missing in the code.
 
-The threat model is a home LAN. Everything runs and is demonstrated from one apartment, and nothing crosses the internet yet.
+The threat model started as a home LAN. The server side is now meant to run on a public VPS (see [docs/deploy.md](docs/deploy.md)), so the hop from the gateway to the cloud crosses the internet; the node-to-gateway hop stays inside the house.
 
 ## What is in place
 
@@ -24,13 +24,17 @@ So the gateway protects the server from bad data. It does not authenticate nodes
 
 ## Known vulnerabilities
 
-### 1. No TLS on any hop
+### 1. No TLS inside the house, and the gateway does not use it to the cloud yet
 
-`infra/mosquitto/mosquitto.conf` has `listener 1883` with no TLS, and the gateway's broker connection has `usetls: false`. MQTT credentials travel in the CONNECT packet in cleartext, so anyone on the same WiFi can capture them and then publish as the node or the gateway.
+**On the server this is done:** `infra/docker-compose.prod.yml` puts the API behind Caddy (HTTPS with a Let's Encrypt certificate) and gives the broker a TLS listener on 8883 using the same certificate. The broker's plain listener on 1883 is not published; only the API reaches it, inside the compose network.
 
-The config file already states the intent (`In production the listener is TLS (8883)`), but nothing implements it.
+What is still open:
 
-**Accepted for now**, because all traffic stays on the home LAN. This becomes the single most important gap the moment the gateway talks to a broker outside the house: that hop must not ship without TLS.
+- `infra/mosquitto/mosquitto.conf` (the development broker, also the gateway's local broker) has `listener 1883` with no TLS, and the node's connection is plain. MQTT credentials travel in the CONNECT packet in cleartext, so anyone on the same WiFi can capture them and then publish as the node.
+- **The gateway's own connection to the cloud broker has `usetls: false`** in the Node-RED flow, so it cannot connect to the public broker at all until that is switched on and the host name is set to the domain. Until then the gateway must not be pointed at the VPS: its password would cross the internet in cleartext.
+- The public broker's port 8883 is open to everyone. Without credentials nobody can connect (`allow_anonymous false`), but the port is reachable and the broker is exposed to whatever vulnerabilities it has.
+
+**Accepted for the node-to-gateway hop**, because that traffic stays on the home LAN.
 
 ### 2. A node can publish as any planter
 
@@ -85,7 +89,7 @@ What is still open:
 
 In order of importance:
 
-1. TLS on every hop that leaves the house: HTTPS for the API and `/api/pair`, and a TLS MQTT listener with the gateway verifying the broker's certificate.
+1. TLS on every hop that leaves the house. The server side exists (HTTPS for the API and `/api/pair`, a TLS MQTT listener); what is left is the gateway calling them over TLS and verifying the broker's certificate.
 2. Per-node credentials scoped to one topic, issued by pairing rather than flashed.
 3. Server-side sessions, so a stolen cookie can be revoked.
 4. Splitting the API's broker client into a provisioning admin and a read-only ingest client.

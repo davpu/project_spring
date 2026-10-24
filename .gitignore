@@ -54,6 +54,8 @@ vitest.config.*.timestamp*
 
 # Local environment
 .env
+.env.*
+!.env.example
 
 # Node-RED runtime state - only the flow and settings are versioned
 /infra/nodered/data/*

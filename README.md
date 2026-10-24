@@ -175,9 +175,13 @@ The API's tests are integration tests: they run the real application against the
 
 CI (`.github/workflows/ci.yml`) runs `pnpm nx format:check` and `pnpm nx run-many -t lint test build typecheck` on every push to `main` and on every pull request.
 
+## Deployment
+
+The cloud side (database, broker, API, HTTPS) runs on a VPS from `infra/docker-compose.prod.yml`; [docs/deploy.md](docs/deploy.md) has the steps. The Dockerfile for the API is `infra/docker/api.Dockerfile`.
+
 ## Security
 
-`SECURITY.md` records what the current setup protects against, what it does not, and which gaps are deliberate. The short version: users and gateways authenticate and every query is scoped to its owner, but nothing uses TLS yet and sessions cannot be revoked, so this is a home-LAN system and not more than that.
+`SECURITY.md` records what the current setup protects against, what it does not, and which gaps are deliberate. The short version: users and gateways authenticate and every query is scoped to its owner, and the server side serves HTTPS and a TLS broker listener, but the gateway does not use TLS yet, the node-to-gateway hop is plain, and sessions cannot be revoked.
 
 ## Status
 

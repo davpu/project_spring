@@ -1,0 +1,112 @@
+# Production stack on the VPS: database, broker, API and the reverse proxy.
+# Usage (from repo root): see docs/deploy.md
+#   docker compose --env-file .env.production -f infra/docker-compose.prod.yml up -d --build
+#
+# Only 80, 443 and 8883 are published. The database and the API's plain MQTT
+# listener are reachable from inside the compose network only.
+name: spring-prod
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spring
+      # Only used when the data volume is first created; changing it later
+      # does not change the database's password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run infra/prod/init-env.sh}
+      POSTGRES_DB: spring
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U spring -d spring']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    environment:
+      # Only used when the dynamic-security config is first created; changing
+      # it later does not change the admin's password.
+      MQTT_ADMIN_USER: ${MQTT_ADMIN_USER:?run infra/prod/init-env.sh}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?run infra/prod/init-env.sh}
+      TLS_CERT: /caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${DOMAIN}/${DOMAIN}.crt
+      TLS_KEY: /caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${DOMAIN}/${DOMAIN}.key
+    ports:
+      - '8883:8883'
+    volumes:
+      - ./mosquitto/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/entrypoint.sh:/entrypoint.sh:ro
+      - mosquitto-data:/mosquitto/data
+      - caddy-data:/caddy-data:ro
+    entrypoint: ['/bin/sh', '/entrypoint.sh']
+    command: ['/usr/sbin/mosquitto', '-c', '/mosquitto/config/mosquitto.conf']
+
+  # Runs once per deploy and exits; the API waits for it.
+  migrate:
+    image: spring-api
+    command: ['node', 'migrate.mjs']
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgres://spring:${POSTGRES_PASSWORD}@db:5432/spring
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+    image: spring-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgres://spring:${POSTGRES_PASSWORD}@db:5432/spring
+      JWT_SECRET: ${JWT_SECRET:?run infra/prod/init-env.sh}
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_PUBLIC_URL: mqtts://${DOMAIN}:8883
+      MQTT_ADMIN_USER: ${MQTT_ADMIN_USER}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mosquitto:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?run infra/prod/init-env.sh}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here; the broker reads its certificate from this volume too.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+volumes:
+  db-data:
+  mosquitto-data:
+  caddy-data:
+  caddy-config:
