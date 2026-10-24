@@ -9,6 +9,7 @@ import { styleReset } from 'react95';
 import original from 'react95/dist/themes/original';
 import msSansSerif from 'react95/dist/fonts/ms_sans_serif.woff2';
 import msSansSerifBold from 'react95/dist/fonts/ms_sans_serif_bold.woff2';
+import arrow from '../assets/cursors/arrow.svg';
 import hourglass from '../assets/cursors/hourglass.svg';
 
 const GlobalStyles = createGlobalStyle`
@@ -27,6 +28,18 @@ const GlobalStyles = createGlobalStyle`
   }
   body, input, select, textarea, button {
     font-family: 'ms_sans_serif';
+  }
+  /*
+   * Win95 arrow everywhere, overriding react95's own pointer cursors; text
+   * fields keep the I-beam. Same specificity as the arrow rule and later,
+   * so it wins there but still loses to the busy hourglass below.
+   */
+  html,
+  html * {
+    cursor: url('${arrow}') 0 0, default !important;
+  }
+  html :where(input:not([type='checkbox'], [type='radio']), textarea) {
+    cursor: text !important;
   }
   /* Set by lib/busy.ts while anything is loading. */
   html[data-busy],

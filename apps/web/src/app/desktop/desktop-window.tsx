@@ -17,7 +17,6 @@ const Header = styled(WindowHeader)`
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  cursor: default;
   user-select: none;
   touch-action: none;
 `;

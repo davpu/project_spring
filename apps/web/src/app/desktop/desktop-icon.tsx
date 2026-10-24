@@ -11,7 +11,6 @@ const IconButton = styled.button`
   border: none;
   background: none;
   color: #fff;
-  cursor: default;
 
   &:focus {
     outline: none;

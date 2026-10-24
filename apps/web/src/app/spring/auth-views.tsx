@@ -44,7 +44,6 @@ const LinkButton = styled.button`
   background: none;
   color: ${({ theme }) => theme.anchor};
   text-decoration: underline;
-  cursor: pointer;
 `;
 
 const Alert = styled.p`
