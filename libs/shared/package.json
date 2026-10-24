@@ -14,7 +14,15 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "shared"
+    "name": "shared",
+    "targets": {
+      "contract-gen": {
+        "command": "jiti scripts/generate-contract.mts",
+        "options": {
+          "cwd": "libs/shared"
+        }
+      }
+    }
   },
   "dependencies": {}
 }

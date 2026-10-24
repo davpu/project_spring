@@ -4,6 +4,8 @@ import {
   PairRequestSchema,
   TelemetryPayloadSchema,
   formatPairingCode,
+  nodeTopics,
+  parseNodeTelemetryTopic,
   parseStatusTopic,
   parseTelemetryTopic,
   telemetryToReadings,
@@ -15,35 +17,80 @@ const gatewayId = '2f1c9a52-5e5b-4d5c-9a43-6d2f3c1b7a10';
 describe('telemetry payload', () => {
   it('accepts the agreed gateway format', () => {
     expect(
-      TelemetryPayloadSchema.safeParse({ temp: 20, hum: 30, soil: 40 }).success,
+      TelemetryPayloadSchema.safeParse({
+        airTemperature: 20.4,
+        airHumidity: 30,
+        soilHumidity: 40,
+      }).success,
     ).toBe(true);
   });
 
   it('accepts a subset of measurements', () => {
-    expect(TelemetryPayloadSchema.safeParse({ temp: 21.5 }).success).toBe(true);
+    expect(
+      TelemetryPayloadSchema.safeParse({ airTemperature: 21.5 }).success,
+    ).toBe(true);
+  });
+
+  it('leaves air temperature unbounded', () => {
+    expect(
+      TelemetryPayloadSchema.safeParse({ airTemperature: -273.1 }).success,
+    ).toBe(true);
+    expect(
+      TelemetryPayloadSchema.safeParse({ airTemperature: 1200 }).success,
+    ).toBe(true);
   });
 
   it('rejects empty payloads, unknown keys and out-of-range values', () => {
     expect(TelemetryPayloadSchema.safeParse({}).success).toBe(false);
-    expect(TelemetryPayloadSchema.safeParse({ temperature: 20 }).success).toBe(
+    expect(TelemetryPayloadSchema.safeParse({ temp: 20 }).success).toBe(false);
+    expect(TelemetryPayloadSchema.safeParse({ airHumidity: 120 }).success).toBe(
       false,
     );
-    expect(TelemetryPayloadSchema.safeParse({ hum: 120 }).success).toBe(false);
+    expect(TelemetryPayloadSchema.safeParse({ soilHumidity: -1 }).success).toBe(
+      false,
+    );
   });
 
-  it('maps short keys to metric ids, using ts when present and receive time otherwise', () => {
+  it('does not police decimal resolution, only whole-number metrics', () => {
+    // Resolution is a producer concern (METRIC_RESOLUTION, applied by the
+    // firmware), not a schema rule: `multipleOf` on a non-integer is checked
+    // float-safely by Zod but not by the ajv build inside Node-RED, so the two
+    // validators would disagree on a third of all one-decimal values. Integers
+    // are exact in both.
+    expect(
+      TelemetryPayloadSchema.safeParse({ airHumidity: 30.7 }).success,
+    ).toBe(true);
+    expect(
+      TelemetryPayloadSchema.safeParse({ airHumidity: 30.75 }).success,
+    ).toBe(true);
+    expect(TelemetryPayloadSchema.safeParse({ soilHumidity: 40 }).success).toBe(
+      true,
+    );
+    expect(
+      TelemetryPayloadSchema.safeParse({ soilHumidity: 40.5 }).success,
+    ).toBe(false);
+  });
+
+  it('flattens measurements, using ts when present and receive time otherwise', () => {
     const receivedAt = new Date('2026-01-01T00:00:00Z');
     const withTs = TelemetryPayloadSchema.parse({
       ts: '2025-12-31T23:00:00+00:00',
-      hum: 30,
+      airHumidity: 30,
     });
     expect(telemetryToReadings(withTs, receivedAt)).toEqual([
-      { time: new Date('2025-12-31T23:00:00Z'), metric: 'humidity', value: 30 },
+      {
+        time: new Date('2025-12-31T23:00:00Z'),
+        metric: 'airHumidity',
+        value: 30,
+      },
     ]);
-    const withoutTs = TelemetryPayloadSchema.parse({ temp: 0, soil: 40 });
+    const withoutTs = TelemetryPayloadSchema.parse({
+      airTemperature: 0,
+      soilHumidity: 40,
+    });
     expect(telemetryToReadings(withoutTs, receivedAt)).toEqual([
-      { time: receivedAt, metric: 'temperature', value: 0 },
-      { time: receivedAt, metric: 'soil_moisture', value: 40 },
+      { time: receivedAt, metric: 'airTemperature', value: 0 },
+      { time: receivedAt, metric: 'soilHumidity', value: 40 },
     ]);
   });
 });
@@ -74,6 +121,21 @@ describe('topics', () => {
   it('parses status topics', () => {
     expect(parseStatusTopic(topics.status(gatewayId))).toEqual({ gatewayId });
     expect(parseStatusTopic(`gateways/${gatewayId}/status/extra`)).toBeNull();
+  });
+
+  it('round-trips the local node -> gateway leg', () => {
+    expect(parseNodeTelemetryTopic(nodeTopics.telemetry('balcony-1'))).toEqual({
+      sensorKey: 'balcony-1',
+    });
+  });
+
+  it('rejects malformed local topics', () => {
+    expect(parseNodeTelemetryTopic('planters/balcony-1')).toBeNull();
+    expect(parseNodeTelemetryTopic('planters/A+B/telemetry')).toBeNull();
+    expect(parseNodeTelemetryTopic('planters/a/b/telemetry')).toBeNull();
+    expect(
+      parseNodeTelemetryTopic(topics.telemetry(gatewayId, 'balcony-1')),
+    ).toBeNull();
   });
 });
 
