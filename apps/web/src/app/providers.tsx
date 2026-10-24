@@ -24,8 +24,16 @@ const GlobalStyles = createGlobalStyle`
     font-weight: bold;
     font-style: normal;
   }
-  body, input, select, textarea {
+  body, input, select, textarea, button {
     font-family: 'ms_sans_serif';
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 `;
 

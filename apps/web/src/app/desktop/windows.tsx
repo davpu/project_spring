@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Computer } from '@react95/icons/Computer';
 import { FolderExe } from '@react95/icons/FolderExe';
 import { RecycleEmpty } from '@react95/icons/RecycleEmpty';
+import { SpringApp } from '../spring/spring-app';
 
 export type WindowId = 'computer' | 'app' | 'recycle';
 
@@ -33,7 +34,7 @@ export const WINDOWS: WindowSpec[] = [
     title: 'Spring',
     icon: <FolderExe variant="32x32_4" />,
     smallIcon: <FolderExe variant="16x16_4" />,
-    content: <p>Here will be the app.</p>,
+    content: <SpringApp />,
   },
   {
     id: 'recycle',
