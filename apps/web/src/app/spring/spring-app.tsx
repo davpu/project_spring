@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from 'react95';
-import type { User } from './auth-api';
+import { useSession } from '../session';
 import {
   ForgotPasswordView,
   LoginView,
@@ -16,7 +16,7 @@ const VIEWS = {
 
 /** Everything the Spring app does happens inside its desktop window. */
 export function SpringApp() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, setUser } = useSession();
   const [view, setView] = useState<AuthView>('login');
 
   if (user) {
@@ -25,13 +25,7 @@ export function SpringApp() {
         <p style={{ margin: 0 }}>
           Logged in as <b>{user.email}</b>.
         </p>
-        <Button
-          style={{ alignSelf: 'flex-end' }}
-          onClick={() => {
-            setUser(null);
-            setView('login');
-          }}
-        >
+        <Button style={{ alignSelf: 'flex-end' }} onClick={() => setUser(null)}>
           Log out
         </Button>
       </div>
@@ -39,5 +33,15 @@ export function SpringApp() {
   }
 
   const View = VIEWS[view];
-  return <View key={view} onNavigate={setView} onAuthenticated={setUser} />;
+  return (
+    <View
+      key={view}
+      onNavigate={setView}
+      onAuthenticated={(next) => {
+        // Whoever logs out next (here or from the Start menu) lands on login.
+        setView('login');
+        setUser(next);
+      }}
+    />
+  );
 }

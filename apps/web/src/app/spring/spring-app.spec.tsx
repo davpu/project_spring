@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Providers } from '../providers';
+import { SessionProvider } from '../session';
 import { SpringApp } from './spring-app';
 
 const type = (label: RegExp | string, value: string) =>
@@ -9,7 +10,9 @@ describe('SpringApp', () => {
   beforeEach(() => {
     render(
       <Providers>
-        <SpringApp />
+        <SessionProvider>
+          <SpringApp />
+        </SessionProvider>
       </Providers>,
     );
   });

@@ -1,7 +1,12 @@
 import { Desktop } from './desktop/desktop';
+import { SessionProvider } from './session';
 
 export function App() {
-  return <Desktop />;
+  return (
+    <SessionProvider>
+      <Desktop />
+    </SessionProvider>
+  );
 }
 
 export default App;
