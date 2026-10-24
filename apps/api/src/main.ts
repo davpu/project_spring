@@ -1,18 +1,26 @@
-/**
- * This is not a production server yet!
- * This is only a minimal backend to get started.
- */
-
+import 'dotenv/config';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
+import { APP_CONFIG, type AppConfig } from './config/config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const config = app.get<AppConfig>(APP_CONFIG);
+
+  app.use(cookieParser());
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
+  // Lets the MQTT connection and the DB pool close cleanly on SIGTERM.
+  app.enableShutdownHooks();
+  // In production the API sits behind a reverse proxy that terminates TLS, so
+  // the client address and protocol come from its forwarded headers. Without
+  // this every request would share the proxy's address in the rate limiter.
+  if (config.isProduction) app.set('trust proxy', 1);
+
+  await app.listen(config.port);
   // Set when Nx waits for this server to be ready
   if (process.env.NX_READY_SIGNAL_SOCKET) {
     try {
@@ -26,7 +34,7 @@ async function bootstrap() {
     }
   }
   Logger.log(
-    `🚀 Application is running on: http://localhost:${port}/${globalPrefix}`,
+    `🚀 Application is running on: http://localhost:${config.port}/${globalPrefix}`,
   );
 }
 

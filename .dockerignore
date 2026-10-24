@@ -1,0 +1,13 @@
+.git
+.nx
+.env
+.env.*
+node_modules
+**/node_modules
+dist
+**/dist
+out-tsc
+tmp
+coverage
+firmware
+infra/nodered/data
