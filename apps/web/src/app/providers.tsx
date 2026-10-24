@@ -9,6 +9,7 @@ import { styleReset } from 'react95';
 import original from 'react95/dist/themes/original';
 import msSansSerif from 'react95/dist/fonts/ms_sans_serif.woff2';
 import msSansSerifBold from 'react95/dist/fonts/ms_sans_serif_bold.woff2';
+import hourglass from '../assets/cursors/hourglass.svg';
 
 const GlobalStyles = createGlobalStyle`
   ${styleReset}
@@ -26,6 +27,11 @@ const GlobalStyles = createGlobalStyle`
   }
   body, input, select, textarea, button {
     font-family: 'ms_sans_serif';
+  }
+  /* Set by lib/busy.ts while anything is loading. */
+  html[data-busy],
+  html[data-busy] * {
+    cursor: url('${hourglass}') 12 18, wait !important;
   }
   .visually-hidden {
     position: absolute;

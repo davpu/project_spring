@@ -3,11 +3,13 @@ import type {
   LoginRequest,
   RegisterRequest,
 } from '@org/shared';
+import { trackBusy } from '../../lib/busy';
 
 /**
  * Stand-in for the auth endpoints until the API has them. Accounts live in
  * memory for the page's lifetime; swap `call` for a `fetch` wrapper later and
- * keep the signatures.
+ * keep the signatures. Every call goes through `trackBusy`, so the hourglass
+ * cursor shows while it runs.
  */
 
 export type User = { email: string };
@@ -16,10 +18,11 @@ export class AuthError extends Error {}
 
 const accounts = new Map<string, string>();
 
-const call = async <T>(handler: () => T) => {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  return handler();
-};
+const call = <T>(handler: () => T) =>
+  trackBusy(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return handler();
+  });
 
 export function login({ email, password }: LoginRequest): Promise<User> {
   return call(() => {
