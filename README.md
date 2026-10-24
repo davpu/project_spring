@@ -63,7 +63,7 @@ A gateway has to be paired with a user account before it can publish anything. F
 
 ## API
 
-NestJS, under the `/api` prefix. Request and response shapes live in `libs/shared/src/lib/api.ts`. Everything except `/api/health`, `/api/auth/register`, `/api/auth/login` and `/api/pair` needs the session cookie that register and login set.
+NestJS, under the `/api` prefix. Request and response shapes live in `libs/shared/src/lib/api.ts`; [docs/api.md](docs/api.md) has the details with examples and error codes. Everything except `/api/health`, `/api/auth/register`, `/api/auth/login` and `/api/pair` needs the session cookie that register and login set.
 
 | route                                         | purpose                                                           |
 | --------------------------------------------- | ----------------------------------------------------------------- |
