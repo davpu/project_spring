@@ -69,6 +69,17 @@ describe('auth', () => {
     await post({ email: uniqueEmail() }).expect(400);
   });
 
+  it('enforces the password rules the sign-up form shows', async () => {
+    const post = (password: string) =>
+      t
+        .anonymous()
+        .post('/api/auth/register')
+        .send({ email: uniqueEmail(), password });
+    await post('all-lowercase-1').expect(400);
+    await post('NoDigitsHere').expect(400);
+    await post('Valid-password-1').expect(201);
+  });
+
   it('answers a wrong password and an unknown email identically', async () => {
     const { email } = await signUp(t);
     const wrongPassword = await t

@@ -21,7 +21,7 @@ import { MqttService } from '../mqtt/mqtt.service';
 
 /** Every account these tests create matches this, so cleanup can find them. */
 const TEST_EMAIL_PATTERN = 'test-%@example.test';
-export const PASSWORD = 'correct-horse-battery';
+export const PASSWORD = 'Correct-horse-battery1';
 
 export const uniqueEmail = () => `test-${randomUUID()}@example.test`;
 

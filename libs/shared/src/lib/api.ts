@@ -5,26 +5,7 @@ import { METRICS, type Metric } from './metrics.js';
 
 // ---- auth ----------------------------------------------------------------
 
-export const EmailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .max(254)
-  .pipe(z.email());
-
-export const RegisterRequestSchema = z.object({
-  email: EmailSchema,
-  /** Upper bound keeps the password hash from being a CPU/memory lever. */
-  password: z.string().min(8).max(128),
-});
-export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
-
-export const LoginRequestSchema = z.object({
-  email: EmailSchema,
-  password: z.string().min(1).max(128),
-});
-export type LoginRequest = z.infer<typeof LoginRequestSchema>;
-
+/** The request schemas (`LoginRequestSchema`, `RegisterRequestSchema`) live in `auth.ts`, shared with the forms. */
 export interface UserDto {
   id: string;
   email: string;

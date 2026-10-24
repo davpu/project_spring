@@ -50,7 +50,7 @@ Rate limits are per client address: 120 requests per minute in general, 10 per m
 { "email": "me@example.com", "password": "at-least-8-chars" }
 ```
 
-Email is trimmed and lowercased. Password is 8 to 128 characters. Returns `201` with `{ "id": "...", "email": "me@example.com" }` and sets the cookie. `409` if the email is taken.
+Email is trimmed and lowercased. Password is 8 to 128 characters with at least one uppercase letter and one digit (`PASSWORD_RULES` in `libs/shared/src/lib/auth.ts`). Returns `201` with `{ "id": "...", "email": "me@example.com" }` and sets the cookie. `409` if the email is taken.
 
 ### `POST /auth/login`
 
