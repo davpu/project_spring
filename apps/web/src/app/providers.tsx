@@ -44,7 +44,7 @@ const GlobalStyles = createGlobalStyle`
   /* Set by lib/busy.ts while anything is loading. */
   html[data-busy],
   html[data-busy] * {
-    cursor: url('${hourglass}') 12 18, wait !important;
+    cursor: url('${hourglass}') 8 13, wait !important;
   }
   .visually-hidden {
     position: absolute;
