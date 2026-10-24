@@ -12,6 +12,8 @@ export type WindowSpec = {
   icon: ReactNode;
   smallIcon: ReactNode;
   content: ReactNode;
+  /** Window width in px; defaults to 420. */
+  width?: number;
 };
 
 export const WINDOWS: WindowSpec[] = [
@@ -35,6 +37,7 @@ export const WINDOWS: WindowSpec[] = [
     icon: <FolderExe variant="32x32_4" />,
     smallIcon: <FolderExe variant="16x16_4" />,
     content: <SpringApp />,
+    width: 640,
   },
   {
     id: 'recycle',

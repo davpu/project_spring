@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
+import { useSession } from '../session';
 import { DesktopIcon } from './desktop-icon';
 import { DesktopWindow } from './desktop-window';
 import { Taskbar } from './taskbar';
@@ -39,6 +40,7 @@ export function Desktop() {
   const [stack, setStack] = useState<WindowId[]>([]);
   const [minimized, setMinimized] = useState<WindowId[]>([]);
   const [shutDown, setShutDown] = useState(false);
+  const { user } = useSession();
 
   const focus = (id: WindowId) => {
     setStack((s) => [...s.filter((w) => w !== id), id]);
@@ -83,6 +85,7 @@ export function Desktop() {
         <DesktopWindow
           key={w.id}
           spec={w}
+          title={w.id === 'app' && !user ? 'Welcome to Spring' : undefined}
           hidden={minimized.includes(w.id)}
           active={w.id === activeId}
           zIndex={10 + stack.indexOf(w.id)}

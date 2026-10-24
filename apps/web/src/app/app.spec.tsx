@@ -33,4 +33,16 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /start/i }));
     expect(screen.getByText('Shut Down...')).toBeTruthy();
   });
+
+  it('titles the Spring window as a logon dialog until you log in', () => {
+    renderApp();
+    fireEvent.doubleClick(screen.getByText('Spring'));
+    const window = screen.getByRole('dialog', { name: 'Welcome to Spring' });
+    expect(window).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(
+      screen.queryByRole('dialog', { name: 'Welcome to Spring' }),
+    ).toBeNull();
+  });
 });

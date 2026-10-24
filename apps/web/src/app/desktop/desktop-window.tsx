@@ -1,11 +1,20 @@
-import { useRef, useState } from 'react';
+import { createContext, useContext, useRef, useState } from 'react';
 import { Button, Window, WindowContent, WindowHeader } from 'react95';
 import styled from 'styled-components';
 import type { WindowSpec } from './windows';
 
-const Positioned = styled(Window)`
+type DesktopWindowControls = { close: () => void };
+
+const DesktopWindowContext = createContext<DesktopWindowControls | null>(null);
+
+/** Lets a window's content close its window; null outside a desktop window. */
+export function useDesktopWindow() {
+  return useContext(DesktopWindowContext);
+}
+
+const Positioned = styled(Window)<{ $width: number }>`
   position: absolute;
-  width: min(420px, calc(100vw - 16px));
+  width: min(${({ $width }) => $width}px, calc(100vw - 16px));
 
   &[hidden] {
     display: none;
@@ -31,6 +40,8 @@ const Title = styled.span`
 
 type DesktopWindowProps = {
   spec: WindowSpec;
+  /** Overrides `spec.title`, e.g. while the window shows a logon dialog. */
+  title?: string;
   active: boolean;
   hidden: boolean;
   zIndex: number;
@@ -41,6 +52,7 @@ type DesktopWindowProps = {
 
 export function DesktopWindow({
   spec,
+  title = spec.title,
   active,
   hidden,
   zIndex,
@@ -54,8 +66,9 @@ export function DesktopWindow({
   return (
     <Positioned
       role="dialog"
-      aria-label={spec.title}
+      aria-label={title}
       hidden={hidden}
+      $width={spec.width ?? 420}
       style={{ left: pos.x, top: pos.y, zIndex }}
       onPointerDown={onFocus}
     >
@@ -78,7 +91,7 @@ export function DesktopWindow({
       >
         <Title>
           {spec.smallIcon}
-          {spec.title}
+          {title}
         </Title>
         <Button
           size="sm"
@@ -92,7 +105,9 @@ export function DesktopWindow({
           </span>
         </Button>
       </Header>
-      <WindowContent>{spec.content}</WindowContent>
+      <DesktopWindowContext.Provider value={{ close: onClose }}>
+        <WindowContent>{spec.content}</WindowContent>
+      </DesktopWindowContext.Provider>
     </Positioned>
   );
 }
