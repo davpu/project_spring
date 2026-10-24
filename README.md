@@ -11,7 +11,7 @@ ESP32 node -> gateway -> MQTT broker -> API -> database
 
 ```
 apps/
-  api/      # NestJS backend - Nx skeleton only, no business logic yet
+  api/      # NestJS backend: auth, pairing, MQTT ingest, read API
   web/      # React dashboard - Nx skeleton only, no business logic yet
 libs/
   shared/   # contracts used by api/web/gateway: metrics, MQTT topics, pairing
@@ -61,6 +61,45 @@ A gateway has to be paired with a user account before it can publish anything. F
 3. The API responds with the gateway's `gatewayId`, its MQTT credentials, and the topic templates to publish on.
 4. The web app polls the pairing status until it is `redeemed` (or `expired`).
 
+## API
+
+NestJS, under the `/api` prefix. Request and response shapes live in `libs/shared/src/lib/api.ts`. Everything except `/api/health`, `/api/auth/register`, `/api/auth/login` and `/api/pair` needs the session cookie that register and login set.
+
+| route                                         | purpose                                                           |
+| --------------------------------------------- | ----------------------------------------------------------------- |
+| `POST /auth/register`, `POST /auth/login`     | create an account / sign in (sets an `HttpOnly` session cookie)   |
+| `POST /auth/logout`, `GET /auth/me`           | sign out / who am I                                               |
+| `POST /pairing-codes`                         | start pairing, returns the code to type into the gateway          |
+| `GET /pairing-codes/:id`                      | `pending`, `redeemed` (with the new `gatewayId`) or `expired`     |
+| `POST /pair`                                  | **gateway, no session:** redeem a code for broker credentials     |
+| `GET /gateways`, `DELETE /gateways/:id`       | list / unpair (revokes the gateway's broker client)               |
+| `GET /planters`, `GET /planters/:id`          | planters with their newest value per metric / one with its plants |
+| `PATCH /planters/:id`, `DELETE /planters/:id` | rename / delete with its plants and readings                      |
+| `GET /planters/:id/readings`                  | `?metric=&from=&to=&bucket=raw\|hour\|day`, see below             |
+| `POST /planters/:id/plants`                   | add a plant; `PATCH`/`DELETE /plants/:id` to change or remove it  |
+| `GET /health`                                 | database and broker connectivity                                  |
+
+`bucket` defaults to `raw` for ranges up to 6 hours, `hour` up to 14 days and `day` beyond that, and the range defaults to the last 24 hours. Hourly and daily points come from the `readings_hourly` continuous aggregate, which includes data not yet materialized, so the newest hour is never missing. A daily average is weighted by sample count, not an average of hourly averages. A raw response is capped at 10 000 points and hourly at 92 days; asking for more is a 400 that says which bucket to use.
+
+A planter you did not create does not exist: someone else's id answers 404, the same as an unknown one.
+
+### Ingest
+
+The API connects to the broker as the dynamic-security admin, grants itself a read role for `gateways/+/planters/+/telemetry`, and subscribes. Which gateway a message is for comes from its topic, and the broker only lets a gateway publish under its own id. A planter is created the first time a gateway reports a new `sensorKey`, named after it, so a new node needs no setup; rename it with `PATCH /planters/:id`. Messages that fail the contract, carry a timestamp more than a year old or a day ahead, or name a gateway that does not exist are dropped and logged, never stored.
+
+The first time the API starts against a fresh broker, granting itself that role makes the broker drop its connection once. It reconnects and carries on; the log shows a "connection lost during setup" warning.
+
+### Pairing, end to end
+
+```bash
+# signed-in user: start pairing
+curl -b cookies -X POST localhost:3000/api/pairing-codes -H 'Content-Type: application/json' -d '{"gatewayName":"Balkon"}'
+# gateway: redeem the code (no session)
+curl -X POST localhost:3000/api/pair -H 'Content-Type: application/json' -d '{"code":"ABCD-2345"}'
+```
+
+The response holds `gatewayId`, the broker URL, username (the `gatewayId`) and password, and the topic templates. The password is shown once and never stored by the API. If creating the broker client fails, the code is not consumed and the gateway can retry.
+
 ## Gateway
 
 The gateway is Node-RED (`infra/nodered`). It subscribes to `planters/+/telemetry` on the local broker, validates the body against the contract, and republishes it upstream under its own identity. It does not transform the payload: the exact bytes a node sent are what the API receives, so there is no second place where telemetry could be reshaped.
@@ -83,7 +122,7 @@ The JSON Schema is emitted as draft-07 and with no `format` keywords, because No
 
 ### Running the gateway locally
 
-Pairing is not implemented yet, so the gateway's identity and broker credentials are set by hand. Put a UUID in `GATEWAY_ID` in `.env`, then create its broker client once (the broker runs with `allow_anonymous false` and the dynamic-security plugin, which the API will eventually drive):
+The Node-RED flow does not call `/api/pair` yet, so the gateway's identity and broker credentials are still set by hand. Put a UUID in `GATEWAY_ID` in `.env`, then create its broker client once (the broker runs with `allow_anonymous false` and the dynamic-security plugin, which the API will eventually drive):
 
 ```bash
 docker compose --env-file .env -f infra/docker-compose.yml exec mosquitto sh -c '
@@ -108,17 +147,20 @@ The editor is on http://localhost:1880, bound to localhost only. Node-RED substi
 
 ```bash
 pnpm install
-cp .env.example .env
+cp .env.example .env        # set JWT_SECRET to your own value
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 pnpm db:migrate
+pnpm nx serve api           # http://localhost:3000/api/health
 ```
+
+The API refuses to start with an incomplete environment and lists everything that is missing. `JWT_SECRET` signs session cookies and must be at least 32 characters.
 
 Then run an app or a test suite through Nx, for example:
 
 ```bash
-pnpm nx serve api
 pnpm nx serve web
 pnpm nx test shared
+pnpm nx test api            # needs the database from the compose stack
 ```
 
 ## Development
@@ -129,18 +171,18 @@ pnpm nx format:check
 pnpm nx test shared
 ```
 
+The API's tests are integration tests: they run the real application against the real TimescaleDB, with only the broker replaced by a recording fake, so the compose database has to be up and migrated. CI starts a TimescaleDB service container and runs `pnpm db:migrate` before the checks.
+
 CI (`.github/workflows/ci.yml`) runs `pnpm nx format:check` and `pnpm nx run-many -t lint test build typecheck` on every push to `main` and on every pull request.
 
 ## Security
 
-`SECURITY.md` records what the current setup protects against, what it does not, and which gaps are deliberate. The short version: every MQTT client authenticates, but nothing uses TLS yet and the API has no authorisation, so this is a home-LAN system and not more than that.
+`SECURITY.md` records what the current setup protects against, what it does not, and which gaps are deliberate. The short version: users and gateways authenticate and every query is scoped to its owner, but nothing uses TLS yet and sessions cannot be revoked, so this is a home-LAN system and not more than that.
 
 ## Status
 
-- `libs/shared` (telemetry contract, MQTT topics, pairing) and `libs/db` (Drizzle schema for users, gateways, pairing codes, planters, plants and readings) are implemented.
-- `apps/api` and `apps/web` are still Nx skeletons: no controllers, no routes, no UI beyond the generated starter page.
-- The gateway validates and forwards telemetry, and the generated contract artifacts are in place.
-- There is no MQTT ingest in the API yet, so telemetry the gateway forwards is not persisted.
-- Pairing is defined in `libs/shared` but no API endpoint implements it, so the gateway's `gatewayId` and broker credentials are configured by hand.
-- The gateway does not publish its `online`/`offline` status yet.
+- `libs/shared` (telemetry contract, MQTT topics, pairing, API contracts) and `libs/db` (Drizzle schema, Timescale hypertable and hourly aggregate) are implemented.
+- `apps/api` is implemented: authentication, pairing, MQTT ingest with automatic planter creation, and the read API for gateways, planters, plants and readings. It is covered by unit and integration tests.
+- `apps/web` is still an Nx skeleton: no UI beyond the generated starter page.
+- The gateway validates and forwards telemetry, and the generated contract artifacts are in place. It does not call `/api/pair` yet, and it does not publish its `online`/`offline` status, so the API only knows a gateway was last seen when it sends telemetry.
 - The ESP32 node reads its sensors and publishes telemetry, but it does not pair with the API: its broker credentials are set at flash time. See `firmware/README.md`.
