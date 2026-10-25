@@ -5,6 +5,8 @@ on:
     branches:
       - main
   pull_request:
+  # A manual run of main deploys it again, which is how to retry a failed deploy.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -50,3 +52,33 @@ jobs:
 
       - run: pnpm nx format:check
       - run: pnpm nx run-many -t lint test build typecheck
+
+  # Runs only for main, and only once every check above has passed on that
+  # commit. The secrets belong to the "production" environment, so a pull request
+  # cannot read them. See docs/deploy.md for how the key and the server are set up.
+  deploy:
+    needs: main
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: production
+    # Two merges in a row deploy one after the other, never at the same time.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The server's key is pinned in DEPLOY_KNOWN_HOSTS, so a changed or
+          # unknown host is refused instead of trusted. The sha is the "command";
+          # the server runs infra/prod/deploy.sh with it, whatever is sent.
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$GITHUB_SHA"
