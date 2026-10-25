@@ -56,6 +56,24 @@ Email is trimmed and lowercased. Password is 8 to 128 characters with at least o
 
 Same body (password only has to be non-empty). Returns `200` with the same user object and sets the cookie. `401` with `Invalid email or password` for either mistake.
 
+### `POST /auth/forgot-password`
+
+```json
+{ "email": "me@example.com" }
+```
+
+Emails a link to reset the password. Always answers `202` with an empty body, whether or not the address has an account, so the form cannot be used to find out who is registered; tell the user to check their inbox either way. The link looks like `https://clinio.cz/reset-password?token=...`, works once and expires after an hour. An account can have at most 3 live links; asking again past that sends nothing. `400` only if the address is not an email address. Limited to 5 requests per minute per client.
+
+### `POST /auth/reset-password`
+
+```json
+{ "token": "the token from the link", "password": "New-password-1" }
+```
+
+Sets the new password, which has to meet the same rules as at registration. Returns `204` and does **not** sign the user in, so the web app should send them to the login form. `400` with `Invalid or expired reset link` for a link that is wrong, expired or already used (the same message for all three), or a `Validation failed` `400` for a password that breaks the rules; in that case the link is still usable. Using a link also cancels any other open links of that account. Sessions that are already signed in stay signed in.
+
+The web app needs a page at `/reset-password` that reads `token` from the query string, asks for the new password and calls this endpoint.
+
 ### `POST /auth/logout`
 
 `204`, clears the cookie. Works without a session.

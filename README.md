@@ -63,21 +63,22 @@ A gateway has to be paired with a user account before it can publish anything. F
 
 ## API
 
-NestJS, under the `/api` prefix. Request and response shapes live in `libs/shared/src/lib/api.ts`; [docs/api.md](docs/api.md) has the details with examples and error codes. Everything except `/api/health`, `/api/auth/register`, `/api/auth/login` and `/api/pair` needs the session cookie that register and login set.
+NestJS, under the `/api` prefix. Request and response shapes live in `libs/shared/src/lib/api.ts`; [docs/api.md](docs/api.md) has the details with examples and error codes. Everything except `/api/health`, `/api/auth/register`, `/api/auth/login`, the two password reset routes and `/api/pair` needs the session cookie that register and login set.
 
-| route                                         | purpose                                                           |
-| --------------------------------------------- | ----------------------------------------------------------------- |
-| `POST /auth/register`, `POST /auth/login`     | create an account / sign in (sets an `HttpOnly` session cookie)   |
-| `POST /auth/logout`, `GET /auth/me`           | sign out / who am I                                               |
-| `POST /pairing-codes`                         | start pairing, returns the code to type into the gateway          |
-| `GET /pairing-codes/:id`                      | `pending`, `redeemed` (with the new `gatewayId`) or `expired`     |
-| `POST /pair`                                  | **gateway, no session:** redeem a code for broker credentials     |
-| `GET /gateways`, `DELETE /gateways/:id`       | list / unpair (revokes the gateway's broker client)               |
-| `GET /planters`, `GET /planters/:id`          | planters with their newest value per metric / one with its plants |
-| `PATCH /planters/:id`, `DELETE /planters/:id` | rename / delete with its plants and readings                      |
-| `GET /planters/:id/readings`                  | `?metric=&from=&to=&bucket=raw\|hour\|day`, see below             |
-| `POST /planters/:id/plants`                   | add a plant; `PATCH`/`DELETE /plants/:id` to change or remove it  |
-| `GET /health`                                 | database and broker connectivity                                  |
+| route                                                     | purpose                                                           |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| `POST /auth/register`, `POST /auth/login`                 | create an account / sign in (sets an `HttpOnly` session cookie)   |
+| `POST /auth/logout`, `GET /auth/me`                       | sign out / who am I                                               |
+| `POST /auth/forgot-password`, `POST /auth/reset-password` | email a reset link / set a new password with it                   |
+| `POST /pairing-codes`                                     | start pairing, returns the code to type into the gateway          |
+| `GET /pairing-codes/:id`                                  | `pending`, `redeemed` (with the new `gatewayId`) or `expired`     |
+| `POST /pair`                                              | **gateway, no session:** redeem a code for broker credentials     |
+| `GET /gateways`, `DELETE /gateways/:id`                   | list / unpair (revokes the gateway's broker client)               |
+| `GET /planters`, `GET /planters/:id`                      | planters with their newest value per metric / one with its plants |
+| `PATCH /planters/:id`, `DELETE /planters/:id`             | rename / delete with its plants and readings                      |
+| `GET /planters/:id/readings`                              | `?metric=&from=&to=&bucket=raw\|hour\|day`, see below             |
+| `POST /planters/:id/plants`                               | add a plant; `PATCH`/`DELETE /plants/:id` to change or remove it  |
+| `GET /health`                                             | database and broker connectivity                                  |
 
 `bucket` defaults to `raw` for ranges up to 6 hours, `hour` up to 14 days and `day` beyond that, and the range defaults to the last 24 hours. Hourly and daily points come from the `readings_hourly` continuous aggregate, which includes data not yet materialized, so the newest hour is never missing. A daily average is weighted by sample count, not an average of hourly averages. A raw response is capped at 10 000 points and hourly at 92 days; asking for more is a 400 that says which bucket to use.
 

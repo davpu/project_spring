@@ -77,6 +77,15 @@ services:
       MQTT_PUBLIC_URL: mqtts://${DOMAIN}:8883
       MQTT_ADMIN_USER: ${MQTT_ADMIN_USER}
       MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD}
+      # Links in emails point here.
+      APP_URL: https://${DOMAIN}
+      # Outgoing mail for password resets. Optional: without SMTP_HOST the API
+      # runs, but cannot send them.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
