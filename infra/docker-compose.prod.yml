@@ -6,6 +6,13 @@
 # listener are reachable from inside the compose network only.
 name: spring-prod
 
+# The API image is built once and also runs the migrations. Both services carry
+# the build section: without it compose would try to pull `spring-api` from
+# Docker Hub on a machine that has not built it yet.
+x-api-build: &api-build
+  context: ..
+  dockerfile: infra/docker/api.Dockerfile
+
 services:
   db:
     image: timescale/timescaledb:latest-pg17
@@ -46,6 +53,7 @@ services:
 
   # Runs once per deploy and exits; the API waits for it.
   migrate:
+    build: *api-build
     image: spring-api
     command: ['node', 'migrate.mjs']
     restart: 'no'
@@ -56,9 +64,7 @@ services:
         condition: service_healthy
 
   api:
-    build:
-      context: ..
-      dockerfile: infra/docker/api.Dockerfile
+    build: *api-build
     image: spring-api
     restart: unless-stopped
     environment:
