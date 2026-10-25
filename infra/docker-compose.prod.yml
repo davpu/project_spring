@@ -11,7 +11,8 @@ name: spring-prod
 # Docker Hub on a machine that has not built it yet.
 x-api-build: &api-build
   context: ..
-  dockerfile: infra/docker/api.Dockerfile
+  dockerfile: infra/docker/Dockerfile
+  target: api
 
 services:
   db:
@@ -95,7 +96,11 @@ services:
       start_period: 20s
 
   caddy:
-    image: caddy:2
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile
+      target: web
+    image: spring-web
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?run infra/prod/init-env.sh}
@@ -104,7 +109,6 @@ services:
       - '443:443'
       - '443:443/udp'
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Certificates live here; the broker reads its certificate from this volume too.
       - caddy-data:/data
       - caddy-config:/config

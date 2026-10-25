@@ -1,14 +1,40 @@
-# Terminates TLS (the certificate comes from Let's Encrypt automatically) and
-# forwards /api to the API. DOMAIN is set in .env.production.
+# Terminates TLS (the certificate comes from Let's Encrypt automatically),
+# forwards /api to the API and serves the web app's static files for everything
+# else. This file is baked into the web image (infra/docker/Dockerfile).
+# DOMAIN is set in .env.production.
 {$DOMAIN} {
 	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=15552000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
 
 	handle /api/* {
 		reverse_proxy api:3000
 	}
 
-	# Placeholder until the web app is served from here.
+	# File names under /assets carry a content hash, so they never change and can be
+	# cached for good. A missing one is a 404, not index.html: after a deploy a
+	# browser that still holds the old page asks for the old file, and must not be
+	# handed HTML (and told to keep it) in its place.
+	handle /assets/* {
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Everything else, index.html above all, is checked again on every visit, so
+	# a new deploy shows up at once.
 	handle {
-		respond "spring" 200
+		root * /srv
+		header Cache-Control "no-cache"
+
+		# A route of the single-page app (/planters/abc) has no file of its own:
+		# serve index.html and let the router take over.
+		try_files {path} /index.html
+		file_server
 	}
 }
