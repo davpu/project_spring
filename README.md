@@ -177,7 +177,7 @@ CI (`.github/workflows/ci.yml`) runs `pnpm nx format:check` and `pnpm nx run-man
 
 ## Deployment
 
-The cloud side (database, broker, API, HTTPS) runs on a VPS from `infra/docker-compose.prod.yml`; [docs/deploy.md](docs/deploy.md) has the steps. The Dockerfile for the API is `infra/docker/api.Dockerfile`.
+The cloud side (database, broker, API, HTTPS) runs on a VPS from `infra/docker-compose.prod.yml`; [docs/deploy.md](docs/deploy.md) has the steps. A merge to `main` deploys itself through GitHub Actions once the checks pass (`infra/prod/deploy.sh`). The Dockerfile for the API is `infra/docker/api.Dockerfile`.
 
 ## Security
 
