@@ -24,9 +24,12 @@ export const PASSWORD_RULES = [
   },
 ] as const;
 
+/** Lowercased so one address is one account whatever case it was typed in. */
 export const EmailSchema = z
   .string()
   .trim()
+  .toLowerCase()
+  .max(254, 'At most 254 characters')
   .pipe(z.email('Enter a valid email address'));
 
 export const PasswordSchema = PASSWORD_RULES.reduce(

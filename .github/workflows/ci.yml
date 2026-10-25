@@ -12,6 +12,27 @@ permissions:
 jobs:
   main:
     runs-on: ubuntu-latest
+
+    # The API's integration tests run against a real TimescaleDB: the SQL, the
+    # constraints and the continuous aggregate are what they are checking.
+    services:
+      db:
+        image: timescale/timescaledb:latest-pg17
+        env:
+          POSTGRES_USER: spring
+          POSTGRES_PASSWORD: spring
+          POSTGRES_DB: spring
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spring -d spring"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://spring:spring@localhost:5432/spring
+
     steps:
       - uses: actions/checkout@v5
 
@@ -24,6 +45,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - run: pnpm db:migrate
 
       - run: pnpm nx format:check
       - run: pnpm nx run-many -t lint test build typecheck

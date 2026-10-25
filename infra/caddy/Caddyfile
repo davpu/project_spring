@@ -1,0 +1,14 @@
+# Terminates TLS (the certificate comes from Let's Encrypt automatically) and
+# forwards /api to the API. DOMAIN is set in .env.production.
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Placeholder until the web app is served from here.
+	handle {
+		respond "spring" 200
+	}
+}
