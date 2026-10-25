@@ -4,6 +4,7 @@ import { APP_CONFIG, type AppConfig } from '../config/config';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Global()
 @Module({
@@ -14,7 +15,7 @@ import { AuthService } from './auth.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard],
+  providers: [AuthService, AuthGuard, PasswordResetService],
   exports: [AuthService, AuthGuard],
 })
 export class AuthModule {}

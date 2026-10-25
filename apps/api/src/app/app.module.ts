@@ -6,6 +6,7 @@ import { ConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { GatewaysModule } from '../gateways/gateways.module';
 import { IngestModule } from '../ingest/ingest.module';
+import { MailModule } from '../mail/mail.module';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { PairingModule } from '../pairing/pairing.module';
 import { PlantersModule } from '../planters/planters.module';
@@ -18,6 +19,7 @@ import { HealthController } from './health.controller';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ConfigModule,
     DbModule,
+    MailModule,
     MqttModule,
     AuthModule,
     PairingModule,
