@@ -3,7 +3,8 @@
 One Ubuntu server runs everything the cloud side needs: TimescaleDB, the MQTT broker, the API and Caddy, all from `infra/docker-compose.prod.yml`. The gateway and the nodes stay at home.
 
 ```
-internet ──443──> Caddy ──> API ──> TimescaleDB
+internet ──443──> Caddy ──> web app (static files)
+                       └──> /api ──> API ──> TimescaleDB
          ──80───> Caddy (certificate renewal, redirect to 443)
          ──8883─> Mosquitto (TLS) <── API (plain 1883, inside the compose network only)
 ```

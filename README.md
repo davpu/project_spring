@@ -177,7 +177,7 @@ CI (`.github/workflows/ci.yml`) runs `pnpm nx format:check` and `pnpm nx run-man
 
 ## Deployment
 
-The cloud side (database, broker, API, HTTPS) runs on a VPS from `infra/docker-compose.prod.yml`; [docs/deploy.md](docs/deploy.md) has the steps. A merge to `main` deploys itself through GitHub Actions once the checks pass (`infra/prod/deploy.sh`). The Dockerfile for the API is `infra/docker/api.Dockerfile`.
+The cloud side (database, broker, API, the web app, HTTPS) runs on a VPS from `infra/docker-compose.prod.yml`; [docs/deploy.md](docs/deploy.md) has the steps. A merge to `main` deploys itself through GitHub Actions once the checks pass (`infra/prod/deploy.sh`). `infra/docker/Dockerfile` builds the two images, `api` and `web` (the built web app served by Caddy). The web app and the API share one domain, so `/api` needs no CORS and the session cookie just works.
 
 ## Security
 

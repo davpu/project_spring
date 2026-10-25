@@ -1,6 +1,8 @@
-# The API image. Build context is the repository root:
-#   docker build -f infra/docker/api.Dockerfile -t spring-api .
-# The same image runs the migrations (see docker-compose.prod.yml).
+# Images for the production stack. Build context is the repository root, and each
+# image is a target of this file:
+#   docker build -f infra/docker/Dockerfile --target api -t spring-api .   (default)
+#   docker build -f infra/docker/Dockerfile --target web -t spring-web .
+# The api image also runs the migrations (see docker-compose.prod.yml).
 
 FROM node:24-slim AS base
 RUN corepack enable
@@ -10,7 +12,7 @@ FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
 ENV NX_DAEMON=false
-RUN pnpm nx build api
+RUN pnpm nx run-many -t build -p api web
 
 # Production dependencies of the API only, without the web app's or the tooling's.
 FROM base AS prod-deps
@@ -21,7 +23,12 @@ COPY libs/db/package.json libs/db/
 COPY libs/shared/package.json libs/shared/
 RUN pnpm install --frozen-lockfile --prod --filter @org/api...
 
-FROM node:24-slim AS runtime
+# The web app's static files with Caddy, which also does the TLS and proxies /api to the API.
+FROM caddy:2 AS web
+COPY infra/caddy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/apps/web/dist /srv
+
+FROM node:24-slim AS api
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules node_modules
