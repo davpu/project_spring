@@ -150,6 +150,30 @@ A failed deploy does **not** roll back. The server keeps whatever it managed to 
 
 **What this trusts.** Anyone who can merge to `main` can run code on the server, because the deploy builds whatever is there. That is inherent to deploying on merge, so keep `main` protected (pull requests only) as it is now. The key itself can only start the deploy script, and the script only deploys commits that are on `main`, so a leaked key cannot be used to run anything else or to deploy a different branch.
 
+## Outgoing mail
+
+The API sends password reset links through an SMTP server. It is optional: without one the API runs normally, but cannot send resets (in production it logs an error, never the link).
+
+Use a mailbox made only for sending, such as `noreply@clinio.cz`, not a personal one: its password lives in `.env.production`. On the server, add these lines to that file (edit it with `nano .env.production`; do not paste the password anywhere else):
+
+```
+SMTP_HOST=smtp.forpsi.com
+SMTP_PORT=465
+SMTP_USER=noreply@clinio.cz
+SMTP_PASSWORD=the-mailbox-password
+MAIL_FROM=Spring <noreply@clinio.cz>
+```
+
+Port 465 is TLS from the first byte; 587 upgrades with STARTTLS. Either is accepted, the API refuses to log in over an unencrypted connection. `MAIL_FROM` should be the address of the mailbox, or one the provider lets that mailbox send as, otherwise the message is rejected or ends up in spam.
+
+The file is only read when the API container is created, so apply it with:
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.prod.yml up -d
+```
+
+Test it with an account you own: ask for a reset on the sign-in page (or `POST /api/auth/forgot-password`), then look in the inbox, and in the spam folder. In the message source `SPF` and `DKIM` should both say `PASS`. If nothing arrives, `docker compose ... logs api --tail 30` shows `Could not send a password reset email` with the reason: a wrong password is an authentication error, a wrong port or a blocked connection is a timeout or `ECONNREFUSED`.
+
 ## What the gateway has to do
 
 These settings are the gateway's (Node-RED), not the server's:

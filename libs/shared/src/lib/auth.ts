@@ -68,3 +68,13 @@ export const ForgotPasswordRequestSchema = z.object({
   email: EmailSchema,
 });
 export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequestSchema>;
+
+/**
+ * Web app -> API: set a new password with the token from the reset email.
+ * The new password has to meet the same rules as at sign-up.
+ */
+export const ResetPasswordRequestSchema = z.object({
+  token: z.string().min(1).max(200),
+  password: PasswordSchema,
+});
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequestSchema>;

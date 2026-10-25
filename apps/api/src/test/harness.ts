@@ -16,6 +16,7 @@ import request from 'supertest';
 import { AppModule } from '../app/app.module';
 import { DB } from '../db/db.module';
 import { IngestService } from '../ingest/ingest.service';
+import { MailService } from '../mail/mail.service';
 import { DynsecService } from '../mqtt/dynsec.service';
 import { MqttService } from '../mqtt/mqtt.service';
 
@@ -44,11 +45,15 @@ export async function createTestApp() {
     subscribe: vi.fn(),
   };
 
+  const mail = { send: vi.fn().mockResolvedValue(undefined) };
+
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(MqttService)
     .useValue(mqtt)
     .overrideProvider(DynsecService)
     .useValue(dynsec)
+    .overrideProvider(MailService)
+    .useValue(mail)
     // Rate limits are a production concern; with a shared client address every
     // registration here would otherwise hit the credential limit. Replacing the
     // counter store (rather than the guard) leaves the real guard in place.
@@ -73,6 +78,7 @@ export async function createTestApp() {
     app,
     db,
     dynsec,
+    mail,
     ingest: app.get(IngestService),
     /** A client with its own cookie jar. */
     agent: () => request.agent(app.getHttpServer()),

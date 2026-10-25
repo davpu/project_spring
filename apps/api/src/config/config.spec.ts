@@ -18,7 +18,18 @@ describe('loadConfig', () => {
       mqttPublicUrl: 'mqtt://localhost:1883',
       mqttAdminUser: 'api',
       mqttAdminPassword: 'secret',
+      appUrl: 'http://localhost:4200',
+      mail: null,
     });
+  });
+
+  it('takes the address of the web app, without a trailing slash', () => {
+    expect(
+      loadConfig({ ...valid, APP_URL: 'https://example.com/' }).appUrl,
+    ).toBe('https://example.com');
+    expect(() => loadConfig({ ...valid, APP_URL: 'not a url' })).toThrow(
+      /APP_URL/,
+    );
   });
 
   it('hands gateways the public broker URL when one is set', () => {
