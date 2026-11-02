@@ -1,1 +1,75 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles. Everything else is react95 and styled-components. */
+
+/* Readings chart (components/line-chart.tsx), in the Win95 palette. */
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+}
+.chart--empty {
+  padding: 32px 16px;
+  color: #808080;
+  text-align: center;
+}
+.chart__grid {
+  stroke: #c0c0c0;
+  stroke-width: 1;
+}
+.chart__axis {
+  fill: #000;
+  font-size: 11px;
+}
+.chart__band {
+  fill: #000080;
+  opacity: 0.12;
+}
+.chart__area {
+  fill: #000080;
+  opacity: 0.08;
+}
+.chart__line {
+  fill: none;
+  stroke: #000080;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart__dot {
+  fill: #fff;
+  stroke: #000080;
+  stroke-width: 1.5;
+}
+.chart__threshold {
+  stroke: #c00000;
+  stroke-dasharray: 5 4;
+  stroke-width: 1.4;
+}
+.chart__threshold-label {
+  fill: #c00000;
+  font-size: 11px;
+  font-weight: bold;
+}
+.chart__cursor {
+  stroke: #808080;
+  stroke-dasharray: 3 3;
+}
+.chart__point {
+  fill: #000080;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.chart__readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  min-height: 24px;
+  margin-top: 6px;
+  color: #808080;
+  font-size: 14px;
+}
+.chart__readout strong {
+  color: #000;
+}

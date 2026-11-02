@@ -1,13 +1,26 @@
 import { useState } from 'react';
-import type { z } from 'zod';
-import { AuthError } from './auth-api';
+import { z } from 'zod';
+import { ApiError, describeError } from '../app/api/client';
+import { trackBusy } from './busy';
 
 type Errors<T> = Partial<Record<keyof T, string>>;
 
 /**
- * Minimal form state for the auth screens: values, per-field errors from a
- * zod schema, and a submit handler. Fields are re-validated as you type only
- * after the first submit, so an empty form doesn't start out red.
+ * A required, trimmed, length-limited text field with messages written for
+ * people. The API checks the same limits with zod's default wording.
+ */
+export const requiredText = (what: string, max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1, `Enter ${what}`)
+    .max(max, `At most ${max} characters`);
+
+/**
+ * Minimal form state: values, per-field errors from a zod schema, and a submit
+ * handler. Fields are re-validated as you type only after the first submit, so
+ * an empty form doesn't start out red. A 400 from the API that names fields is
+ * shown under those fields; anything else becomes `formError`.
  */
 export function useForm<
   S extends z.ZodType<Record<string, unknown>, Record<string, string>>,
@@ -55,11 +68,21 @@ export function useForm<
     if (!result.success) return;
     setPending(true);
     try {
-      await onSubmit(result.data);
+      // The hourglass shows while the user waits on a submit.
+      await trackBusy(() => onSubmit(result.data));
     } catch (err) {
-      setFormError(
-        err instanceof AuthError ? err.message : 'Something went wrong.',
-      );
+      const fieldErrors: Errors<Values> = {};
+      if (err instanceof ApiError && err.status === 400) {
+        for (const issue of err.issues) {
+          const key = issue.path.split('.')[0] as keyof Values;
+          if (key in (values as object)) fieldErrors[key] ??= issue.message;
+        }
+      }
+      if (Object.keys(fieldErrors).length > 0) setErrors(fieldErrors);
+      else if (err instanceof ApiError && err.issues[0]) {
+        // A 400 about something the form has no field for (e.g. the token).
+        setFormError(err.issues[0].message);
+      } else setFormError(describeError(err));
     } finally {
       setPending(false);
     }

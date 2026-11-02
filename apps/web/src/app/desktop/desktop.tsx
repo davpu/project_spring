@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useSession } from '../session';
 import { DesktopIcon } from './desktop-icon';
@@ -41,14 +42,18 @@ const Icons = styled.div`
 
 export function Desktop() {
   const [selected, setSelected] = useState<WindowId | null>(null);
+  const location = useLocation();
   // Open windows in stacking order; the last visible one is on top and active.
-  const [stack, setStack] = useState<WindowId[]>([]);
+  // The password-reset link from the email opens the Spring window by itself.
+  const [stack, setStack] = useState<WindowId[]>(() =>
+    location.pathname === '/reset-password' ? ['app'] : [],
+  );
   const [minimized, setMinimized] = useState<WindowId[]>([]);
   const [power, setPower] = useState<Power>(() =>
     wasBootRequested() ? 'starting' : 'on',
   );
   const [shutdownDialog, setShutdownDialog] = useState(false);
-  const { user, setUser } = useSession();
+  const { user, logout } = useSession();
 
   useEffect(() => {
     const delay = TIMINGS[power];
@@ -81,7 +86,7 @@ export function Desktop() {
     if (choice === 'restart') restart();
     if (choice === 'logoff') {
       // "Close all programs and log on as a different user"
-      setUser(null);
+      void logout();
       setMinimized([]);
       setStack(['app']);
     }

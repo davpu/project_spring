@@ -12,7 +12,7 @@ ESP32 node -> gateway -> MQTT broker -> API -> database
 ```
 apps/
   api/      # NestJS backend: auth, pairing, MQTT ingest, read API
-  web/      # React dashboard - Nx skeleton only, no business logic yet
+  web/      # React dashboard in a Windows 95 shell: login, planters, charts, gateway pairing
 libs/
   shared/   # contracts used by api/web/gateway: metrics, MQTT topics, pairing
   db/       # Drizzle schema and Postgres/TimescaleDB client
@@ -188,6 +188,6 @@ The cloud side (database, broker, API, the web app, HTTPS) runs on a VPS from `i
 
 - `libs/shared` (telemetry contract, MQTT topics, pairing, API contracts) and `libs/db` (Drizzle schema, Timescale hypertable and hourly aggregate) are implemented.
 - `apps/api` is implemented: authentication, pairing, MQTT ingest with automatic planter creation, and the read API for gateways, planters, plants and readings. It is covered by unit and integration tests.
-- `apps/web` is still an Nx skeleton: no UI beyond the generated starter page.
+- `apps/web` is implemented as a Windows 95 desktop (react95): the Spring window holds sign up, log in and password reset, a dashboard with what needs water, planters with live values and readings charts, plants, and gateway pairing. "Needs water" is decided in the browser against a per-planter limit kept in `localStorage` (default 30 %), because the API stores readings, not thresholds. The dev server proxies `/api` to `localhost:3000`, so start the API first.
 - The gateway validates and forwards telemetry, and the generated contract artifacts are in place. It does not call `/api/pair` yet, and it does not publish its `online`/`offline` status, so the API only knows a gateway was last seen when it sends telemetry.
 - The ESP32 node reads its sensors and publishes telemetry, but it does not pair with the API: its broker credentials are set at flash time. See `firmware/README.md`.
