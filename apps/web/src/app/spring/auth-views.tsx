@@ -2,23 +2,27 @@ import { useState, type ReactNode } from 'react';
 import {
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
+  PasswordSchema,
   RegisterFormSchema,
+  type UserDto,
 } from '@org/shared';
 import { Password1010 } from '@react95/icons/Password1010';
 import { Button } from 'react95';
 import styled from 'styled-components';
+import { z } from 'zod';
 import { PasswordChecklist } from '../../components/password-checklist';
 import { PasswordField } from '../../components/password-field';
 import { TextField } from '../../components/text-field';
+import { FormError, TextLink } from '../../components/win95';
+import { useForm } from '../../lib/use-form';
+import { auth } from '../api/api';
 import { useDesktopWindow } from '../desktop/desktop-window';
-import { login, register, requestPasswordReset, type User } from './auth-api';
-import { useForm } from './use-form';
 
 export type AuthView = 'login' | 'register' | 'forgot';
 
 type ViewProps = {
   onNavigate: (view: AuthView) => void;
-  onAuthenticated: (user: User) => void;
+  onAuthenticated: (user: UserDto) => void;
 };
 
 /** Icon | prompt and fields | buttons, like the Win95 "Welcome to Windows" logon. */
@@ -55,27 +59,13 @@ const Buttons = styled.div`
   }
 `;
 
-const LinkButton = styled.button`
+const LinkButton = styled(TextLink)`
   align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: none;
-  color: ${({ theme }) => theme.anchor};
-  text-decoration: underline;
 
   @media (min-width: 480px) {
     margin-left: calc(var(--label-width) + 8px);
   }
 `;
-
-const Alert = styled.p`
-  margin: 0;
-  color: #c00;
-`;
-
-function FormError({ children }: { children: ReactNode }) {
-  return children ? <Alert role="alert">{children}</Alert> : null;
-}
 
 type LogonDialogProps = {
   label: string;
@@ -128,7 +118,7 @@ export function LoginView({ onNavigate, onAuthenticated }: ViewProps) {
   const form = useForm(
     LoginRequestSchema,
     { email: '', password: '' },
-    async (values) => onAuthenticated(await login(values)),
+    async (values) => onAuthenticated(await auth.login(values)),
   );
 
   return (
@@ -145,7 +135,6 @@ export function LoginView({ onNavigate, onAuthenticated }: ViewProps) {
       }
     >
       <TextField
-        inline
         label="Email:"
         type="email"
         autoComplete="email"
@@ -153,7 +142,6 @@ export function LoginView({ onNavigate, onAuthenticated }: ViewProps) {
         {...form.field('email')}
       />
       <PasswordField
-        inline
         label="Password:"
         autoComplete="current-password"
         {...form.field('password')}
@@ -171,7 +159,7 @@ export function RegisterView({ onNavigate, onAuthenticated }: ViewProps) {
     RegisterFormSchema,
     { email: '', password: '', confirmPassword: '' },
     async ({ email, password }) =>
-      onAuthenticated(await register({ email, password })),
+      onAuthenticated(await auth.register({ email, password })),
   );
 
   return (
@@ -183,7 +171,6 @@ export function RegisterView({ onNavigate, onAuthenticated }: ViewProps) {
       onCancel={() => onNavigate('login')}
     >
       <TextField
-        inline
         label="Email:"
         type="email"
         autoComplete="email"
@@ -191,14 +178,12 @@ export function RegisterView({ onNavigate, onAuthenticated }: ViewProps) {
         {...form.field('email')}
       />
       <PasswordField
-        inline
         label="Password:"
         autoComplete="new-password"
         hint={<PasswordChecklist password={form.values.password} />}
         {...form.field('password')}
       />
       <PasswordField
-        inline
         label="Confirm password:"
         autoComplete="new-password"
         {...form.field('confirmPassword')}
@@ -214,7 +199,7 @@ export function ForgotPasswordView({ onNavigate }: ViewProps) {
     ForgotPasswordRequestSchema,
     { email: '' },
     async (values) => {
-      await requestPasswordReset(values);
+      await auth.forgotPassword(values);
       setSentTo(values.email);
     },
   );
@@ -246,12 +231,83 @@ export function ForgotPasswordView({ onNavigate }: ViewProps) {
       onCancel={() => onNavigate('login')}
     >
       <TextField
-        inline
         label="Email:"
         type="email"
         autoComplete="email"
         autoFocus
         {...form.field('email')}
+      />
+      <FormError>{form.formError}</FormError>
+    </LogonDialog>
+  );
+}
+
+const NewPasswordSchema = z
+  .object({ password: PasswordSchema, confirmPassword: z.string() })
+  .refine((form) => form.password === form.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match',
+  });
+
+/**
+ * Target of the link in the reset email (`/reset-password?token=...`). The
+ * API does not sign the user in afterwards, so this hands back to the logon.
+ */
+export function ResetPasswordView({
+  token,
+  onSuccess,
+  onCancel,
+}: {
+  token: string | null;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const form = useForm(
+    NewPasswordSchema,
+    { password: '', confirmPassword: '' },
+    async ({ password }) => {
+      await auth.resetPassword({ token: token ?? '', password });
+      onSuccess();
+    },
+  );
+
+  if (!token) {
+    return (
+      <LogonDialog
+        label="Reset password"
+        prompt={
+          <span role="alert">
+            The reset link is incomplete. Open it again from the email, or ask
+            for a new one from the logon screen.
+          </span>
+        }
+        onSubmit={(e) => {
+          e.preventDefault();
+          onCancel();
+        }}
+      />
+    );
+  }
+
+  return (
+    <LogonDialog
+      label="New password"
+      prompt="Choose a new password for Spring."
+      onSubmit={form.handleSubmit}
+      pending={form.pending}
+      onCancel={onCancel}
+    >
+      <PasswordField
+        label="New password:"
+        autoComplete="new-password"
+        autoFocus
+        hint={<PasswordChecklist password={form.values.password} />}
+        {...form.field('password')}
+      />
+      <PasswordField
+        label="Confirm password:"
+        autoComplete="new-password"
+        {...form.field('confirmPassword')}
       />
       <FormError>{form.formError}</FormError>
     </LogonDialog>

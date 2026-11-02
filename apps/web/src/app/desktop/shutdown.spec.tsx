@@ -1,6 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import App from '../app';
-import { Providers } from '../providers';
+import { act, fireEvent, screen } from '@testing-library/react';
+import { USER, renderApp, startApi } from '../../test/render-app';
 import { closeTab, restart, wasBootRequested } from './power';
 
 vi.mock('./power', () => ({
@@ -8,13 +7,6 @@ vi.mock('./power', () => ({
   restart: vi.fn(),
   wasBootRequested: vi.fn(() => false),
 }));
-
-const renderApp = () =>
-  render(
-    <Providers>
-      <App />
-    </Providers>,
-  );
 
 const openShutdownDialog = () => {
   fireEvent.click(screen.getByRole('button', { name: /start/i }));
@@ -28,8 +20,16 @@ const choose = (label: string) => {
 };
 
 describe('Shut Down', () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => vi.useRealTimers());
+  let restore: () => void = () => undefined;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Nobody is signed in unless a test says otherwise.
+    restore = startApi(() => undefined, false).restore;
+  });
+  afterEach(() => {
+    restore();
+    vi.useRealTimers();
+  });
 
   it('closes the dialog on No without doing anything', () => {
     renderApp();
@@ -41,9 +41,11 @@ describe('Shut Down', () => {
     expect(restart).not.toHaveBeenCalled();
   });
 
-  it('shuts down, tries to close the tab and powers on again', () => {
+  it('shuts down, tries to close the tab and powers on again', async () => {
     vi.useFakeTimers();
     renderApp();
+    // Let the session check finish so its hourglass is gone before we start.
+    await act(() => Promise.resolve());
     openShutdownDialog();
     choose('Shut down the app?');
     expect(
@@ -69,27 +71,24 @@ describe('Shut Down', () => {
   });
 
   it('logs off: closes every window and opens the login', async () => {
+    restore();
+    // Signed in, with nothing paired yet.
+    restore = startApi(({ method, path }) =>
+      method === 'GET' && (path === '/planters' || path === '/gateways')
+        ? { body: [] }
+        : undefined,
+    ).restore;
     renderApp();
     fireEvent.doubleClick(screen.getByText('Recycle Bin'));
     fireEvent.doubleClick(screen.getByText('Spring'));
-    // Sign up so there is someone to log off.
-    fireEvent.click(screen.getByRole('button', { name: 'Sign Up...' }));
-    for (const [label, value] of [
-      ['Email:', 'gardener@example.com'],
-      ['Password:', 'Sunflower7'],
-      ['Confirm password:', 'Sunflower7'],
-    ] as const) {
-      fireEvent.change(screen.getByLabelText(label), { target: { value } });
-    }
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }));
-    expect(await screen.findByText('gardener@example.com')).toBeTruthy();
+    expect(await screen.findByText(USER.email)).toBeTruthy();
 
     openShutdownDialog();
     choose('Close all programs and log on as a different user?');
 
     expect(screen.queryByRole('dialog', { name: 'Recycle Bin' })).toBeNull();
     expect(
-      screen.getByRole('dialog', { name: 'Welcome to Spring' }),
+      await screen.findByRole('dialog', { name: 'Welcome to Spring' }),
     ).toBeTruthy();
     expect(screen.getByRole('form', { name: 'Log in' })).toBeTruthy();
   });

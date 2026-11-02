@@ -9,10 +9,12 @@ export default defineConfig(() => ({
   server: {
     port: 4200,
     host: 'localhost',
+    proxy: { '/api': 'http://localhost:3000' },
   },
   preview: {
     port: 4300,
     host: 'localhost',
+    proxy: { '/api': 'http://localhost:3000' },
   },
   plugins: [react(), nxReadySignal()],
   // Uncomment this if you are using workers.
@@ -32,6 +34,9 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'jsdom',
+    // Role queries over the react95 desktop are slow in jsdom.
+    testTimeout: 20_000,
+    setupFiles: ['./src/test/setup.ts'],
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {

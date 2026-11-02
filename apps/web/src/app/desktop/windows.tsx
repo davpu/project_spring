@@ -37,7 +37,7 @@ export const WINDOWS: WindowSpec[] = [
     icon: <FolderExe variant="32x32_4" />,
     smallIcon: <FolderExe variant="16x16_4" />,
     content: <SpringApp />,
-    width: 640,
+    width: 820,
   },
   {
     id: 'recycle',
